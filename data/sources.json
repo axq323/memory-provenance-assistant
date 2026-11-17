@@ -1,0 +1,32 @@
+{
+  "c1": {
+    "title": "Essay revision: History of Computing essay",
+    "date": "2026-10-03",
+    "turns": [
+      {"speaker": "user", "text": "I've got your comments on my essay draft. Can you turn them into a list of what I need to change?"},
+      {"speaker": "assistant", "text": "Of course. Your draft has three main issues: the thesis appears late, paragraphs 3 and 4 overlap, and two claims need citations. Here is a detailed breakdown of each..."},
+      {"speaker": "user", "text": "Please keep it to short bullet points, I just need a quick list of what to change before tonight.", "memory_ids": ["m1"]},
+      {"speaker": "assistant", "text": "- Move the thesis into paragraph 1\n- Merge paragraphs 3 and 4\n- Add citations for the ENIAC and Turing claims"}
+    ]
+  },
+  "c2": {
+    "title": "Work email: asking my manager for an extension",
+    "date": "2026-10-12",
+    "turns": [
+      {"speaker": "user", "text": "Can you help me ask my manager for a few more days on the quarterly report?"},
+      {"speaker": "assistant", "text": "Sure! Here's a draft: \"Hey! Any chance I could get till Monday for the report? Nearly there 🙂\""},
+      {"speaker": "user", "text": "Make it more formal and professional, it's going to my manager.", "memory_ids": ["m2"]},
+      {"speaker": "assistant", "text": "\"Dear Ms Patel, I am writing to request a short extension to the quarterly report deadline, to Monday 16 October. This would allow me to complete the final figures to the required standard. Kind regards, ...\""}
+    ]
+  },
+  "c3": {
+    "title": "Dinner ideas for the week",
+    "date": "2026-10-20",
+    "turns": [
+      {"speaker": "user", "text": "Can you give me some dinner ideas for this week? I'm vegetarian, so no meat or fish please.", "memory_ids": ["m3"]},
+      {"speaker": "assistant", "text": "Happy to. Do you have much time to cook in the evenings?"},
+      {"speaker": "user", "text": "Not really. On weeknights I need something quick, under 30 minutes.", "memory_ids": ["m4"]},
+      {"speaker": "assistant", "text": "Then here are five vegetarian dinners that each take 30 minutes or less..."}
+    ]
+  }
+}

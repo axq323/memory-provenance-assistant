@@ -1,0 +1,38 @@
+[
+  {
+    "id": "m1",
+    "text": "You prefer short bullet-point summaries rather than long paragraphs.",
+    "origin_task": "feedback",
+    "source_id": "c1",
+    "created": "2026-10-03",
+    "excluded_tasks": [],
+    "edited": null
+  },
+  {
+    "id": "m2",
+    "text": "You want a formal, professional tone in the messages you write.",
+    "origin_task": "work_writing",
+    "source_id": "c2",
+    "created": "2026-10-12",
+    "excluded_tasks": [],
+    "edited": null
+  },
+  {
+    "id": "m3",
+    "text": "You're vegetarian, so no meat or fish.",
+    "origin_task": "cooking",
+    "source_id": "c3",
+    "created": "2026-10-20",
+    "excluded_tasks": [],
+    "edited": null
+  },
+  {
+    "id": "m4",
+    "text": "On weeknights you need quick meals that take under 30 minutes.",
+    "origin_task": "cooking",
+    "source_id": "c3",
+    "created": "2026-10-20",
+    "excluded_tasks": [],
+    "edited": null
+  }
+]
