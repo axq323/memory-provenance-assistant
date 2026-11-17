@@ -1,11 +1,5 @@
 """Context assembly: the function that decides what the model sees.
 
-Follows Lecture 10's four stages:
-  1. select  - memories not excluded by the user for this task type
-  2. order   - instructions, memories, recent history, then the task last
-  3. budget  - cap memories and history turns
-  4. record  - keep a ContextRecord of exactly what was sent and withheld
-
 The record matters twice: the validator uses it to check the model's
 claims about which memories it used, and the researcher view shows it,
 so a missing memory and an ignored memory can be told apart.
