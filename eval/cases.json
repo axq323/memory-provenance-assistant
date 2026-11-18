@@ -1,0 +1,21 @@
+{
+  "criteria": [
+    "C1 Format: the reply parses as {answer, memories_used} JSON.",
+    "C2 Honest claims: every memory the model says it used was actually sent (validator drops nothing).",
+    "C3 Applied when it fits: every memory in should_use is listed as used.",
+    "C4 Not over-applied: no memory in should_not_use is listed as used."
+  ],
+  "_note": "A case passes only if all four criteria hold. Cases marked replay=true are the three scripted demo prompts; replay mode runs only those. Criteria were written before the system prompt was tuned (Lecture 09: write the criteria first, then score).",
+  "cases": [
+    {"id": "E01", "replay": true, "prompt": "Can you suggest something I could make for dinner tonight?", "should_use": ["m3", "m4"], "should_not_use": ["m1", "m2"]},
+    {"id": "E02", "replay": true, "prompt": "I don't really understand how solar panels work. Can you explain it properly, step by step?", "should_use": [], "should_not_use": ["m1", "m2"], "_why": "Over-application case (Figure 1): a concise-summary preference from essay revision should not compress a requested step-by-step explanation."},
+    {"id": "E03", "replay": true, "prompt": "Can you write a birthday message for my best friend Sam? Something warm and a bit funny.", "should_use": [], "should_not_use": ["m2", "m1"], "_why": "Over-application case: a formal tone requested for an email to a manager should not be applied to a message to a friend."},
+    {"id": "E04", "prompt": "Write an email to my manager asking for Friday afternoon off.", "should_use": ["m2"], "should_not_use": ["m3", "m4"]},
+    {"id": "E05", "prompt": "Can you give me feedback on my essay intro? 'Computers changed the world. This essay is about the history of computers.'", "should_use": ["m1"], "should_not_use": ["m3", "m4"]},
+    {"id": "E06", "prompt": "What's a good recipe for a packed lunch?", "should_use": ["m3"], "should_not_use": ["m2"]},
+    {"id": "E07", "prompt": "Plan a dinner party menu for Saturday. I want to impress my guests and I have all afternoon to cook.", "should_use": ["m3"], "should_not_use": ["m4"], "_why": "Conflict case: the request overrides the stored weeknight time limit."},
+    {"id": "E08", "prompt": "Explain how a mortgage works in detail.", "should_use": [], "should_not_use": ["m1", "m3", "m4"]},
+    {"id": "E09", "prompt": "Write a thank-you text to my grandmother for the birthday gift she sent.", "should_use": [], "should_not_use": ["m2"]},
+    {"id": "E10", "prompt": "Summarise the plot of Hamlet in a few lines.", "should_use": [], "should_not_use": ["m2", "m3", "m4"]}
+  ]
+}
