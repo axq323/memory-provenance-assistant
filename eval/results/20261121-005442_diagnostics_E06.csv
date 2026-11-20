@@ -1,0 +1,31 @@
+model,switches,repeat,used,parse_ok,dropped,answer
+llama3.2:3b,normal,1,-,True,-,> **Quick and Easy Vegetarian Packed Lunch Ideas** * Hummus and veggie wrap: Spread hummus
+llama3.2:3b,normal,2,-,True,-,> **Quick and Easy Vegetarian Packed Lunch Ideas** For a healthy and satisfying packed lun
+llama3.2:3b,normal,3,-,True,-,> **Quick and Easy Vegetarian Packed Lunch Ideas** For a healthy and satisfying packed lun
+llama3.2:3b,no-memories,1,-,True,-,> Here's a simple recipe for a delicious and healthy packed lunch: *Grilled Chicken and Av
+llama3.2:3b,no-memories,2,-,True,-,> A packed lunch is a great way to save money and eat healthy. Here's a simple recipe for 
+llama3.2:3b,no-memories,3,-,True,-,> A good packed lunch recipe could include a variety of options such as a wholemeal pita s
+llama3.2:3b,no-json,1,-,False,-,"{""memories_used"": [], ""answer"":""> **Quick and Easy Vegetarian Packed Lunch Ideas** * **Pas"
+llama3.2:3b,no-json,2,-,False,-,"{""memories_used"": [], ""answer"":""> Here's a quick and easy vegetarian recipe for a packed l"
+llama3.2:3b,no-json,3,-,False,-,"{""memories_used"": [], ""answer"":""> Here's a quick and easy vegetarian recipe for a packed l"
+llama3.2:3b,one-system,1,-,True,-,> Here's a quick and easy vegetarian recipe for a packed lunch salad: * 1 cup mixed greens
+llama3.2:3b,one-system,2,-,True,-,> Here's a quick and easy vegetarian recipe for a packed lunch: *Pasta Salad with Roasted 
+llama3.2:3b,one-system,3,-,True,-,> Here's a quick and easy vegetarian recipe for a packed lunch salad: * 1 cup mixed greens
+llama3.2:3b,one-system + no-json,1,-,False,-,"{""memories_used"": [], ""answer"":""> Here's a quick and easy vegetarian recipe for a packed l"
+llama3.2:3b,one-system + no-json,2,-,False,-,"{""memories_used"": [], ""answer"":""> Here's a quick and easy vegetarian packed lunch recipe: "
+llama3.2:3b,one-system + no-json,3,-,False,-,"{""memories_used"": [], ""answer"":""> A quick and easy vegetarian packed lunch idea is a hummu"
+qwen2.5:7b,normal,1,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
+qwen2.5:7b,normal,2,"m3,m4",True,-,"- Whole wheat sandwich with hummus, sliced veggies, and avocado - Carrot sticks - Apple sl"
+qwen2.5:7b,normal,3,"m3,m4",True,-,- Hummus - Sliced cucumbers - Cherry tomatoes - Whole wheat pita bread - Carrot sticks - A
+qwen2.5:7b,no-memories,1,-,True,-,Here's a simple and healthy packed lunch recipe: ### Grilled Chicken Salad Sandwich **Ingr
+qwen2.5:7b,no-memories,2,-,True,-,Here's a simple and healthy packed lunch recipe: ### Grilled Chicken and Avocado Wrap **In
+qwen2.5:7b,no-memories,3,-,True,-,Here's a simple and healthy packed lunch recipe: - Whole wheat sandwich with slices of tur
+qwen2.5:7b,no-json,1,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
+qwen2.5:7b,no-json,2,"m3,m4",True,-,"- Whole wheat sandwich with hummus, sliced cucumber, and tomato - Carrot sticks - Apple sl"
+qwen2.5:7b,no-json,3,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
+qwen2.5:7b,one-system,1,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumbers - Cherry tomatoes - Carrot sticks - Apple s
+qwen2.5:7b,one-system,2,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumbers - Cherry tomatoes - Carrot sticks - Apple s
+qwen2.5:7b,one-system,3,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
+qwen2.5:7b,one-system + no-json,1,"m3,m4",True,-,- Hummus with veggies - Whole grain pita bread - Carrot sticks - Apple slices
+qwen2.5:7b,one-system + no-json,2,"m3,m4",True,-,- Avocado and tomato sandwich - Carrot sticks - Apple slices - Hummus
+qwen2.5:7b,one-system + no-json,3,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
