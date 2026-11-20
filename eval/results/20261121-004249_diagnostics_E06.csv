@@ -1,0 +1,11 @@
+model,switches,repeat,used,parse_ok,dropped,answer
+llama3.2:3b,normal,1,-,True,-,> Here's a quick and easy vegetarian recipe for a packed lunch:* *Packed Lunch Salad* *Ing
+llama3.2:3b,no-memories,1,-,True,-,> Here's a simple recipe for a delicious and healthy packed lunch:<br><br>**Turkey and Avo
+llama3.2:3b,no-json,1,-,False,-,"{""memories_used"": [], ""answer"":""> A quick and easy vegetarian packed lunch recipe is hummu"
+llama3.2:3b,one-system,1,-,True,-,> Here's a quick and easy recipe for a vegetarian packed lunch salad: * 1 cup mixed greens
+llama3.2:3b,one-system + no-json,1,-,False,-,"{""memories_used"": [], ""answer"":""> Here's a quick and easy vegetarian recipe for a packed l"
+qwen2.5:7b,normal,1,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
+qwen2.5:7b,no-memories,1,-,True,-,Here's a simple and healthy packed lunch recipe: ### Avocado and Chicken Salad **Ingredien
+qwen2.5:7b,no-json,1,"m3,m4",True,-,"- Whole wheat sandwich with hummus, sliced cucumber, and avocado - Carrot sticks - Apple s"
+qwen2.5:7b,one-system,1,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
+qwen2.5:7b,one-system + no-json,1,"m3,m4",True,-,- Whole wheat wrap - Hummus - Sliced cucumber - Cherry tomatoes - Carrot sticks - Apple sl
