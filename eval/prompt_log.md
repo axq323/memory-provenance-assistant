@@ -8,3 +8,5 @@ Criteria (written before tuning) are in `eval/cases.json`. Replay mode runs only
 |---|---|---|---|---|---|
 | 20261118-230901 | v1 | replay: replay (scripted demo replies) | 1/3 | Replay baseline | `eval\results\20261118-230901_replay.csv` |
 | 20261119-012031 | v1 | live: live (llama3.2:3b at http://localhost:11434/v1) | 5/10 | First live run, llama3.2:3b, prompt v1 | `eval\results\20261119-012031_live.csv` |
+| 20261119-223747 | v1 | live: live (llama3.2:3b at http://localhost:11434/v1) | 5/10 | Second live run, llama3.2:3b, prompt v1 | `eval\results\20261119-223747_live.csv` |
+| 20261119-232300 | v2 | live: live (llama3.2:3b at http://localhost:11434/v1) | 5/10 | v2: memory list first, MUST-list rule, example, no <br> | `eval\results\20261119-232300_live.csv` |
