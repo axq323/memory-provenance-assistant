@@ -92,3 +92,46 @@ def test_verdict_is_logged(app, tmp_path):
     next(b for b in app.button if (b.key or "").startswith("flag_")).click().run()
     log = (tmp_path / "interaction_log.csv").read_text()
     assert "reply_flagged" in log and "used=m1" in log
+
+
+DINNER = "Can you suggest something I could make for dinner tonight?"
+
+
+def test_influence_check_shows_measured_memories(app, tmp_path):
+    app.chat_input[0].set_value(DINNER).run()
+    next(b for b in app.button if (b.key or "").startswith("infl_")).click().run()
+    assert not app.exception
+    texts = " ".join(m.value for m in app.markdown)
+    assert "Which memories mattered" in texts
+    assert texts.count("Used, as the assistant said") == 2       # m3, m4 (replay reports honestly)
+    assert texts.count("Not used, as the assistant said") == 2   # m1, m2
+    captions = " ".join(c.value for c in app.caption)
+    assert "removing it changed the reply" in captions and "removing it made no difference" in captions
+    log = (tmp_path / "interaction_log.csv").read_text()
+    assert "influence_checked" in log and "m3=agrees" in log
+
+
+def test_influence_check_respects_exclusions(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    next(b for b in app.button if (b.key or "").startswith("nft_") and (b.key or "").endswith(":m1")).click().run()
+    msg_index = len(app.session_state["messages"]) - 1
+    next(b for b in app.button if (b.key or "").startswith("infl_")
+         and (b.key or "").endswith(app.session_state["messages"][msg_index]["turn_id"])).click().run()
+    assert not app.exception
+    tested = {r.id for r in app.session_state["messages"][msg_index]["influence"]}
+    assert "m1" not in tested                      # excluded for explanations, so never sent
+
+
+def test_forget_redacts_influence_results(app):
+    app.chat_input[0].set_value(DINNER).run()
+    next(b for b in app.button if (b.key or "").startswith("infl_")).click().run()
+    next(b for b in app.button if (b.key or "").startswith("forget_") and (b.key or "").endswith(":m3")).click().run()
+    assert not app.exception
+    results = app.session_state["messages"][-1]["influence"]
+    assert all("vegetarian" not in r.text for r in results)
+
+
+def test_influence_toggle_hides_the_check(app):
+    app.toggle(key="influence_check").set_value(False).run()
+    app.chat_input[0].set_value(DINNER).run()
+    assert not any((b.key or "").startswith("infl_") for b in app.button)

@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from mpa.context import assemble  # noqa: E402
+from mpa.counterfactual import check_influence, summarise  # noqa: E402
 from mpa.interaction_log import log_event  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
@@ -27,7 +28,7 @@ RUNTIME = Path(os.getenv("MPA_RUNTIME_DIR", ROOT / "runtime"))
 st.set_page_config(page_title="Memory Provenance Assistant", page_icon="🧠", layout="wide")
 
 
-#  state 
+# ---------------------------------------------------------------- state ---
 @st.cache_resource
 def load_model():
     return get_model()
@@ -43,6 +44,7 @@ ss.setdefault("session_id", uuid.uuid4().hex[:6])
 ss.setdefault("open_sources", set())   # keys of source panels currently open
 ss.setdefault("pending_prompt", None)
 ss.setdefault("flash", [])             # short confirmations shown as toasts
+ss.setdefault("influence_check", True)  # show the counterfactual check (turn off for study sessions)
 # Study condition: A = memories with source context, B = memories only.
 # A researcher can fix it per participant with ?condition=B in the URL.
 ss.setdefault("condition", "B" if st.query_params.get("condition", "A").upper() == "B" else "A")
@@ -139,6 +141,9 @@ def forget(memory_id: str, turn_id: str = "") -> None:
     for m in ss.messages:                      # remove derived copies too (Lecture 10)
         if m["role"] == "assistant":
             m["record"].redact_memory(memory_id)
+            for r in m.get("influence") or []:
+                if r.id == memory_id:
+                    r.text, r.evidence = "[forgotten]", "[forgotten]"
     ss.open_sources = {k for k in ss.open_sources if not k.endswith(memory_id)}
     log("memory_forgotten", turn_id=turn_id, memory_id=memory_id)
     ss.flash.append("Forgotten. It's gone from memory and from the records of past replies.")
@@ -160,7 +165,7 @@ def reset_demo() -> None:
     ss.flash.append("Demo reset: memories restored and chat cleared.")
 
 
-#  rendering 
+# ------------------------------------------------------------ rendering ---
 def render_source(memory_id: str) -> None:
     src = store.source_for(memory_id)
     if src is None:
@@ -217,6 +222,65 @@ def render_memory_chip(msg_index: int, msg: dict, used: dict) -> None:
             render_source(used["id"])
 
 
+VERDICT_LABELS = {
+    "unreported influence": "⚠️ Changed the reply, but the assistant didn't list it",
+    "claimed, no measurable influence": "⚠️ Listed by the assistant, but made no measurable difference",
+    "unclear": "❔ Couldn't tell",
+}
+
+
+def run_influence_check(msg_index: int) -> dict:
+    """Counterfactual check: regenerate without each memory and compare (mpa/counterfactual.py)."""
+    msg = ss.messages[msg_index]
+    rec = msg["record"]
+    reported = {u["id"] for u in msg["reply"].used}
+    results = check_influence(model, msg["user_text"], store.all(), rec.task, rec.trigger,
+                              reported, history_before(msg_index - 1))
+    msg["influence"] = results
+    counts = summarise(results)
+    log("influence_checked", turn_id=msg["turn_id"], task=rec.task,
+        detail=";".join(f"{r.id}={r.verdict}" for r in results))
+    return counts
+
+
+def render_influence(msg_index: int, msg: dict) -> None:
+    results = msg.get("influence")
+    if results is None:
+        calls = 1 + 2 * len(msg["record"].memories_sent) if MODE == "live" else 0
+        help_text = ("Removes each memory in turn, regenerates the reply and compares. "
+                     + (f"Makes about {calls} model calls, so it can take a few minutes."
+                        if MODE == "live" else "Uses the scripted replies in replay mode."))
+        if st.button("🔍 Check which memories mattered", key=f"infl_{msg['turn_id']}", help=help_text):
+            with st.spinner("Regenerating the reply without each memory…"):
+                try:
+                    run_influence_check(msg_index)
+                except ModelError as exc:
+                    st.error(f"The check couldn't run: {exc}")
+                    return
+            st.rerun()
+        return
+    with st.container(border=True):
+        st.markdown("**Which memories mattered (measured, not self-reported)**")
+        if not results:
+            st.caption("No memories were sent with this request, so there was nothing to test.")
+            return
+        for r in results:
+            said = "listed it" if r.reported else "didn't list it"
+            changed = {True: "changed the reply", False: "made no difference", None: "unclear"}[r.influenced]
+            if r.verdict == "agrees":
+                label_text = ("✅ Used, as the assistant said" if r.influenced
+                              else "✅ Not used, as the assistant said")
+            else:
+                label_text = VERDICT_LABELS[r.verdict]
+            st.markdown(f"🧠 {r.text}  \n{label_text}")
+            st.caption(f"Assistant {said} · removing it {changed} · {r.evidence}")
+        mismatches = [r for r in results if r.verdict in ("unreported influence",
+                                                          "claimed, no measurable influence")]
+        if mismatches:
+            st.warning(f"{len(mismatches)} memor{'y' if len(mismatches) == 1 else 'ies'} "
+                       "behaved differently from what the assistant reported.")
+
+
 def render_reply(msg_index: int, msg: dict) -> None:
     reply: ValidatedReply = msg["reply"]
     st.markdown(reply.answer)
@@ -238,6 +302,8 @@ def render_reply(msg_index: int, msg: dict) -> None:
                   on_click=set_verdict, args=(msg_index, "accepted"))
         c2.button("👎 Something's off", key=f"flag_{msg['turn_id']}",
                   on_click=set_verdict, args=(msg_index, "flagged"))
+    if ss.get("influence_check"):
+        render_influence(msg_index, msg)
     if ss.get("researcher_view"):
         render_record(msg)
 
@@ -286,7 +352,7 @@ def render_memory_panel() -> None:
                 render_source(mem["id"])
 
 
-#  page 
+# ---------------------------------------------------------------- page ---
 SHOW_SOURCES = ss.condition == "A"
 for note in ss.flash:
     st.toast(note)
@@ -303,6 +369,8 @@ with st.sidebar:
                  format_func=lambda c: {"A": "A: memories + source context",
                                         "B": "B: memories only"}[c])
         st.toggle("Researcher view", key="researcher_view")
+        st.toggle("Memory influence check", key="influence_check",
+                  help="Turn off during study sessions so both conditions see the same interface.")
         st.button("Reset demo", key="reset_demo", on_click=reset_demo)
         log_file = RUNTIME / "interaction_log.csv"
         if log_file.exists():
