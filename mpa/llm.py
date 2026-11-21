@@ -1,8 +1,14 @@
 """Model back-ends. Both return raw text that goes through the validator.
 
-ReplayModel (SIMULATED): a scripted demo that only covers the prompts shown above the chat.
+ReplayModel (SIMULATED): scripted replies for the demo scenarios. The
+reply is chosen from what context assembly actually sent, so the
+user's corrections change the reply just as they would with a live
+model. Scripting also guarantees every study participant sees the same
+memory misapplication, which a live model would not.
 
-LiveModel (IMPLEMENTED): calls a real LLM (e.g. LLaMA 3) via the OpenAI-compatible API, using the messages in the ContextRecord.
+LiveModel (IMPLEMENTED): any OpenAI-compatible chat endpoint, such as a
+local Ollama server (free, no key) or a hosted API with the reviewer's
+own key. Configuration comes from environment variables (.env).
 """
 
 from __future__ import annotations
@@ -42,7 +48,8 @@ class ReplayModel:
                 best, best_score = s, score
         return best if best_score >= 0.85 else None
 
-    def generate(self, record: ContextRecord, user_text: str) -> str:
+    def generate(self, record: ContextRecord, user_text: str, temperature: float | None = None) -> str:
+        # temperature is accepted for a common interface; scripted replies ignore it
         scenario = self.match(user_text)
         if scenario is None:
             return json.dumps({
@@ -72,11 +79,19 @@ class LiveModel:
         self.temperature = temperature
         self.name = f"live ({model} at {base_url})"
 
-    def generate(self, record: ContextRecord, user_text: str) -> str:
+    def generate(self, record: ContextRecord, user_text: str, temperature: float | None = None) -> str:
+        return self.complete(record.messages,
+                             temperature=self.temperature if temperature is None else temperature)
+
+    def complete(self, messages: list[dict], temperature: float | None = None,
+                 json_mode: bool = True) -> str:
+        """One chat call with arbitrary messages (also used by the counterfactual judge)."""
+        kwargs = {"model": self.model, "messages": messages,
+                  "temperature": self.temperature if temperature is None else temperature}
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
         try:
-            resp = self.client.chat.completions.create(
-                model=self.model, messages=record.messages, temperature=self.temperature,
-                response_format={"type": "json_object"})
+            resp = self.client.chat.completions.create(**kwargs)
         except Exception as exc:  # network, auth, unknown model...
             raise ModelError(f"The model call failed: {type(exc).__name__}: {exc}") from exc
         return resp.choices[0].message.content or ""
@@ -88,6 +103,6 @@ def get_model():
     if mode == "live":
         return LiveModel(
             base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
-            model=os.getenv("LLM_MODEL", "llama3.2:3b"),
+            model=os.getenv("LLM_MODEL", "qwen2.5:7b"),
             api_key=os.getenv("LLM_API_KEY", ""))
     return ReplayModel()
