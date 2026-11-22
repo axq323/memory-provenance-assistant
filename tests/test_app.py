@@ -135,3 +135,68 @@ def test_influence_toggle_hides_the_check(app):
     app.toggle(key="influence_check").set_value(False).run()
     app.chat_input[0].set_value(DINNER).run()
     assert not any((b.key or "").startswith("infl_") for b in app.button)
+
+
+# ------------------------------------------------- stage 1: history and check fixes ---
+def _assistant(at):
+    return [m for m in at.session_state["messages"] if m["role"] == "assistant"]
+
+
+def test_each_reply_stores_the_history_it_was_sent(app):
+    app.chat_input[0].set_value(DINNER).run()
+    app.chat_input[0].set_value(EXPLAIN).run()
+    first, second = _assistant(app)
+    assert first["history"] == []
+    assert [h["role"] for h in second["history"]] == ["user", "assistant"]
+    assert second["history"][0]["content"] == DINNER
+
+
+def test_regeneration_reuses_the_original_history_not_the_bad_reply(app):
+    app.chat_input[0].set_value(DINNER).run()
+    app.chat_input[0].set_value(EXPLAIN).run()
+    original = _assistant(app)[1]
+    next(b for b in app.button if (b.key or "") == f"nft_{original['turn_id']}:m1").click().run()
+    redo = _assistant(app)[-1]
+    assert redo["regenerated_from"] == original["turn_id"]
+    assert redo["history"] == original["history"]
+    assert original["reply"].answer not in [h["content"] for h in redo["history"]]
+
+
+def test_corrected_reply_is_left_out_of_later_history(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    original = _assistant(app)[0]
+    next(b for b in app.button if (b.key or "") == f"nft_{original['turn_id']}:m1").click().run()
+    redo = _assistant(app)[-1]
+    app.chat_input[0].set_value(DINNER).run()
+    contents = [h["content"] for h in _assistant(app)[-1]["history"]]
+    assert original["reply"].answer not in contents
+    assert redo["reply"].answer in contents
+    assert contents.count(EXPLAIN) == 1
+
+
+def test_influence_check_tests_the_memories_as_sent(app):
+    # m3 is excluded for meal ideas AFTER the first dinner reply; checking that
+    # first reply must still test m3, because m3 was sent with it.
+    app.chat_input[0].set_value(DINNER).run()
+    original = _assistant(app)[0]
+    next(b for b in app.button if (b.key or "") == f"nft_{original['turn_id']}:m3").click().run()
+    app.button(key=f"infl_{original['turn_id']}").click().run()
+    assert not app.exception
+    assert {r.id for r in original["influence"]} == {"m1", "m2", "m3", "m4"}
+
+
+def test_clear_chat_keeps_memories_and_corrections(app, tmp_path):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    next(b for b in app.button if (b.key or "").startswith("nft_") and (b.key or "").endswith(":m1")).click().run()
+    app.button(key="clear_chat").click().run()
+    assert not app.exception
+    assert app.session_state["messages"] == []
+    assert any("Not used for explanations" in c.value for c in app.caption)   # correction kept
+    assert "chat_cleared" in (tmp_path / "interaction_log.csv").read_text()
+
+
+def test_no_report_caption_does_not_claim_no_memories_were_used(app):
+    app.chat_input[0].set_value("Tell me a joke").run()
+    captions = [c.value for c in app.caption]
+    assert "The assistant didn't report using any memories." in captions
+    assert not any("No stored memories were used" in c for c in captions)

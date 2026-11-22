@@ -57,13 +57,21 @@ def log(event: str, **kw) -> None:
 
 # -------------------------------------------------------------- actions ---
 def history_before(index: int) -> list[dict]:
+    """Chat history for a new prompt. A reply that was later regenerated (after
+    'Not for ...') is left out, so a corrected reply can't leak into new ones."""
+    superseded = {m.get("regenerated_from") for m in ss.messages if m.get("regenerated_from")}
     hist = []
     for m in ss.messages[:index]:
         if m["role"] == "user":
             hist.append({"role": "user", "content": m["text"]})
-        elif m["role"] == "assistant":
+        elif m["role"] == "assistant" and m["turn_id"] not in superseded:
             hist.append({"role": "assistant", "content": m["reply"].answer})
     return hist
+
+
+def history_of(msg: dict) -> list[dict]:
+    """The exact history that was sent with this reply (reused for regenerations and checks)."""
+    return [dict(h) for h in msg.get("history", [])]
 
 
 def respond(user_text: str, history: list[dict]) -> dict:
@@ -76,7 +84,8 @@ def respond(user_text: str, history: list[dict]) -> dict:
     log("reply_shown", turn_id=record.turn_id, task=task,
         detail="used=" + ",".join(u["id"] for u in reply.used))
     return {"role": "assistant", "turn_id": record.turn_id, "user_text": user_text,
-            "task": task, "reply": reply, "record": record}
+            "task": task, "reply": reply, "record": record,
+            "history": [dict(h) for h in history]}
 
 
 def toggle_source(key: str, memory_id: str, turn_id: str = "") -> None:
@@ -105,7 +114,7 @@ def not_for_task(msg_index: int, memory_id: str) -> None:
                         "undone": False,
                         "text": f"Got it. I won't use “{mem['text']}” for {label(task)}. "
                                 "Here's that reply again without it."})
-    redo = respond(msg["user_text"], history_before(msg_index - 1))
+    redo = respond(msg["user_text"], history_of(msg))   # same history as the reply being corrected
     redo["regenerated_from"] = msg["turn_id"]
     ss.messages.append(redo)
 
@@ -163,6 +172,14 @@ def reset_demo() -> None:
     ss.open_sources = set()
     log("demo_reset")
     ss.flash.append("Demo reset: memories restored and chat cleared.")
+
+
+def clear_chat() -> None:
+    """Start a fresh conversation but keep the memories and the user's corrections."""
+    ss.messages = []
+    ss.open_sources = set()
+    log("chat_cleared")
+    ss.flash.append("Chat cleared. Your memories and corrections are kept.")
 
 
 # ------------------------------------------------------------ rendering ---
@@ -229,13 +246,21 @@ VERDICT_LABELS = {
 }
 
 
+def memories_as_sent(msg: dict) -> list[dict]:
+    """The memories exactly as they were sent with this reply. Later edits or
+    exclusions don't change what is tested; forgotten memories are skipped."""
+    return [{"id": m["id"], "text": m["text"], "excluded_tasks": []}
+            for m in msg["record"].memories_sent if m["text"] != "[forgotten]"]
+
+
 def run_influence_check(msg_index: int) -> dict:
-    """Counterfactual check: regenerate without each memory and compare (mpa/counterfactual.py)."""
+    """Counterfactual check: regenerate without each memory and compare (mpa/counterfactual.py).
+    Uses the memories and history that were actually sent with this reply."""
     msg = ss.messages[msg_index]
     rec = msg["record"]
     reported = {u["id"] for u in msg["reply"].used}
-    results = check_influence(model, msg["user_text"], store.all(), rec.task, rec.trigger,
-                              reported, history_before(msg_index - 1))
+    results = check_influence(model, msg["user_text"], memories_as_sent(msg), rec.task, rec.trigger,
+                              reported, history_of(msg))
     msg["influence"] = results
     counts = summarise(results)
     log("influence_checked", turn_id=msg["turn_id"], task=rec.task,
@@ -291,7 +316,7 @@ def render_reply(msg_index: int, msg: dict) -> None:
         for used in reply.used:
             render_memory_chip(msg_index, msg, used)
     elif reply.parse_ok:
-        st.caption("No stored memories were used in this reply.")
+        st.caption("The assistant didn't report using any memories.")
     verdict = msg.get("verdict")
     if verdict:
         st.caption("You marked this reply as working for you." if verdict == "accepted"
@@ -371,7 +396,11 @@ with st.sidebar:
         st.toggle("Researcher view", key="researcher_view")
         st.toggle("Memory influence check", key="influence_check",
                   help="Turn off during study sessions so both conditions see the same interface.")
-        st.button("Reset demo", key="reset_demo", on_click=reset_demo)
+        st.button("Clear chat (keep memories)", key="clear_chat", on_click=clear_chat,
+                  help="Starts a fresh conversation, so earlier replies can't influence the next one. "
+                       "Memories and your corrections are kept.")
+        st.button("Reset demo", key="reset_demo", on_click=reset_demo,
+                  help="Restores the original memories and clears the chat.")
         log_file = RUNTIME / "interaction_log.csv"
         if log_file.exists():
             st.download_button("Download interaction log", log_file.read_bytes(),
