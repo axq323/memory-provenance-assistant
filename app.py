@@ -21,7 +21,7 @@ from mpa.display import tame_headings  # noqa: E402
 from mpa.interaction_log import log_event, read_log  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
-from mpa.study import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, clean_comment, ground_truth,  # noqa: E402
+from mpa.evaluation import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, clean_comment, ground_truth,  # noqa: E402
                        reliance, score_fit, score_prediction, summarise_task)
 from mpa.task_types import LABELS, classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
@@ -55,18 +55,19 @@ ss.setdefault("open_sources", set())   # keys of source panels currently open
 ss.setdefault("pending_prompt", None)
 ss.setdefault("pending_redo", None)     # index of a reply to rewrite after "Not for ..."
 ss.setdefault("flash", [])             # short confirmations shown as toasts
-ss.setdefault("influence_check", True)  # show the counterfactual check (turn off for study sessions)
-# Study mode adds the outcome measures from Assignment 1 (Section 04) and hides the influence check.
-# A researcher can switch it on per participant with ?study=1 in the URL.
-ss.setdefault("study_mode", st.query_params.get("study", "0") == "1")
-ss.setdefault("awaiting_prediction", None)  # prompt waiting for the participant's prediction
-# A study task runs from the prediction to the fit question: {"msg_index", "turn_id", "started"}.
-# While it is open the participant reacts freely; new prompts are locked until it is finished.
-ss.setdefault("study_task", None)
+ss.setdefault("influence_check", True)  # show the counterfactual check (hidden in evaluation mode)
+# Evaluation mode turns each request into a guided task (predict -> reply -> react -> fit question,
+# then a short questionnaire), so the design can be tested as Assignment 1 proposes. It hides the
+# influence check. Switch it on in the sidebar or with ?evaluate=1 in the URL.
+ss.setdefault("evaluation_mode", st.query_params.get("evaluate", "0") == "1")
+ss.setdefault("awaiting_prediction", None)  # prompt waiting for the user's prediction
+# A task runs from the prediction to the fit question: {"msg_index", "turn_id", "started"}.
+# While it is open the user reacts freely; new prompts are locked until it is finished.
+ss.setdefault("eval_task", None)
 ss.setdefault("awaiting_fit", False)
-ss.setdefault("questionnaire", None)   # None, "open" or "done" (end of the participant's session)
-# Study condition: A = memories with source context, B = memories only.
-# A researcher can fix it per participant with ?condition=B in the URL.
+ss.setdefault("questionnaire", None)   # None, "open" or "done" (end of an evaluation session)
+# Memory-sources setting: A = memories shown with where they came from (the design), B = memories
+# only, so the two can be compared. Logged as "condition". Fix it with ?condition=B in the URL.
 ss.setdefault("condition", "B" if st.query_params.get("condition", "A").upper() == "B" else "A")
 
 
@@ -210,7 +211,7 @@ def reset_demo() -> None:
     ss.open_sources = set()
     ss.awaiting_prediction = None
     ss.pending_redo = None
-    ss.study_task = None
+    ss.eval_task = None
     ss.awaiting_fit = False
     ss.questionnaire = None
     log("demo_reset")
@@ -223,20 +224,21 @@ def clear_chat() -> None:
     ss.open_sources = set()
     ss.awaiting_prediction = None
     ss.pending_redo = None
-    ss.study_task = None
+    ss.eval_task = None
     ss.awaiting_fit = False
     ss.questionnaire = None
     log("chat_cleared")
     ss.flash.append("Chat cleared. Your memories and corrections are kept.")
 
 
-def new_participant() -> None:
-    """Researcher control: fresh memories, empty chat and a new session id, so each
-    participant's actions are logged under their own session."""
+def new_session() -> None:
+    """Fresh memories, an empty chat and a new session id, so the next person's
+    actions are logged separately (evaluation mode)."""
     reset_demo()
     ss.session_id = uuid.uuid4().hex[:6]
-    ss.flash = [f"New participant: session {ss.session_id}, condition {ss.condition}."]
-    log("participant_started", detail=f"condition={ss.condition}")
+    shown = "shown" if ss.condition == "A" else "hidden"
+    ss.flash = [f"New session {ss.session_id}: memory sources {shown}."]
+    log("session_started", detail=f"condition={ss.condition}")
 
 
 def open_questionnaire() -> None:
@@ -256,9 +258,9 @@ def _task_rows(turn_id: str) -> list[dict]:
 
 
 def finish_task() -> None:
-    """Study mode: the participant has finished reacting to the reply. Log what they
+    """Evaluation mode: the user has finished reacting to the reply. Log what they
     did (behavioural reliance), then ask the fit question about the memories used."""
-    task = ss.study_task
+    task = ss.eval_task
     msg = ss.messages[task["msg_index"]]
     used = {u["id"] for u in msg["reply"].used}
     truth = ground_truth(msg["user_text"])
@@ -276,12 +278,12 @@ def finish_task() -> None:
     if fit_questions(msg):
         ss.awaiting_fit = True
     else:                                   # no memory was used, so there is nothing to judge
-        ss.study_task = None
+        ss.eval_task = None
 
 
 def fit_questions(msg: dict) -> list[dict]:
     """The memories the fit question asks about: those the assistant used in the
-    reply the participant reacted to, worded as they were sent (forgotten ones skipped)."""
+    reply the user reacted to, worded as they were sent (forgotten ones skipped)."""
     used = {u["id"] for u in msg["reply"].used}
     return [m for m in msg["record"].memories_sent if m["id"] in used and m["text"] != "[forgotten]"]
 
@@ -479,22 +481,22 @@ def render_reply(msg_index: int, msg: dict) -> None:
                   on_click=set_verdict, args=(msg_index, "accepted"))
         c2.button("👎 Something's off", key=f"flag_{msg['turn_id']}",
                   on_click=set_verdict, args=(msg_index, "flagged"))
-    if ss.get("influence_check") and not ss.get("study_mode"):
+    if ss.get("influence_check") and not ss.get("evaluation_mode"):
         render_influence(msg_index, msg)
-    if ss.get("researcher_view"):
+    if ss.get("developer_view"):
         render_record(msg)
 
 
 def render_record(msg: dict) -> None:
     rec = msg["record"]
     reply: ValidatedReply = msg["reply"]
-    with st.expander("Researcher view: what was sent to the model"):
+    with st.expander("Developer view: what was sent to the model"):
         st.markdown(f"- **Task type:** {label(rec.task)} (trigger: `{rec.trigger or 'none'}`)\n"
                     f"- **Prompt version:** {rec.prompt_version} · **Model:** {model.name}\n"
                     f"- **History turns sent:** {rec.history_turns_sent}")
         if msg.get("prediction"):
             p = msg["prediction"]
-            st.markdown(f"- **Participant predicted:** {', '.join(p['predicted']) or 'none'} "
+            st.markdown(f"- **You predicted:** {', '.join(p['predicted']) or 'none'} "
                         f"(exact match: {p['exact']}, overlap: {p['jaccard']})")
         if msg.get("task_summary"):
             t = msg["task_summary"]
@@ -551,8 +553,8 @@ def render_memory_panel() -> None:
 
 # ---------------------------------------------------------------- page ---
 SHOW_SOURCES = ss.condition == "A"
-# In study mode a new prompt waits until the current task (prediction -> reply -> fit) is finished.
-LOCKED = bool(ss.awaiting_prediction) or (ss.study_mode and (ss.study_task is not None
+# In evaluation mode a new prompt waits until the current task (prediction -> reply -> fit) is finished.
+LOCKED = bool(ss.awaiting_prediction) or (ss.evaluation_mode and (ss.eval_task is not None
                                                              or ss.questionnaire is not None))
 for note in ss.flash:
     st.toast(note)
@@ -564,24 +566,26 @@ with st.sidebar:
     st.divider()
     render_memory_panel()
     st.divider()
-    with st.expander("Researcher controls"):
-        st.radio("Study condition", ["A", "B"], key="condition",
-                 format_func=lambda c: {"A": "A: memories + source context",
-                                        "B": "B: memories only"}[c])
-        st.toggle("Researcher view", key="researcher_view")
-        st.toggle("Study mode", key="study_mode",
-                  help="Adds the prediction step, fit questions and end-of-session questionnaire, "
-                       "and hides the influence check.")
+    with st.expander("Demo and evaluation controls"):
+        st.radio("Memory sources", ["A", "B"], key="condition",
+                 format_func=lambda c: {"A": "Shown: memories + where they came from",
+                                        "B": "Hidden: memories only (for comparison)"}[c])
+        st.toggle("Developer view", key="developer_view",
+                  help="Shows what was sent to the model with each reply.")
+        st.toggle("Evaluation mode", key="evaluation_mode",
+                  help="Guided tasks: predict which memories will be used, react to the reply, say "
+                       "whether each memory suited the request, then a short questionnaire. "
+                       "Hides the influence check.")
         st.toggle("Memory influence check", key="influence_check",
-                  help="Turn off during study sessions so both conditions see the same interface.")
+                  help="Developer tool. Hidden automatically in evaluation mode.")
         st.button("Clear chat (keep memories)", key="clear_chat", on_click=clear_chat,
                   help="Starts a fresh conversation, so earlier replies can't influence the next one. "
                        "Memories and your corrections are kept.")
         st.button("Reset demo", key="reset_demo", on_click=reset_demo,
                   help="Restores the original memories and clears the chat.")
-        st.button("New participant", key="new_participant", on_click=new_participant,
-                  help="Study sessions: resets the demo and starts a new session id in the log, "
-                       "keeping the selected condition.")
+        st.button("Start a new session", key="new_session", on_click=new_session,
+                  help="Resets the demo and logs what happens next under a new session ID, "
+                       "keeping the memory-sources setting.")
         log_file = RUNTIME / "interaction_log.csv"
         if log_file.exists():
             st.download_button("Download interaction log", log_file.read_bytes(),
@@ -613,7 +617,7 @@ for i, msg in enumerate(ss.messages):
             render_reply(i, msg)
 
 def render_prediction_step() -> None:
-    """Study mode: ask which memories the participant expects, before showing the reply."""
+    """Evaluation mode: ask which memories the user expects, before showing the reply."""
     memories = store.all()
     with st.chat_message("assistant", avatar="🔮"):
         with st.form("prediction_form"):
@@ -647,13 +651,13 @@ def render_prediction_step() -> None:
     for key in [f"pred_{m['id']}" for m in memories] + ["pred_none"]:
         ss.pop(key, None)
     ss.awaiting_prediction = None
-    ss.study_task = {"msg_index": len(ss.messages) - 1, "turn_id": reply_msg["turn_id"], "started": _now()}
+    ss.eval_task = {"msg_index": len(ss.messages) - 1, "turn_id": reply_msg["turn_id"], "started": _now()}
     st.rerun()
 
 
 def render_task_controls() -> None:
-    """Study mode, after the reply: free reaction first, then the fit question."""
-    task = ss.study_task
+    """Evaluation mode, after the reply: free reaction first, then the fit question."""
+    task = ss.eval_task
     msg = ss.messages[task["msg_index"]]
     if not ss.awaiting_fit:
         with st.chat_message("assistant", avatar="🔮"):
@@ -684,7 +688,7 @@ def render_task_controls() -> None:
             detail=f"answer={answer};truth={score['truth']};correct={score['correct']};"
                    f"scenario={truth['scenario'] if truth else 'unknown'}")
         ss.pop(f"fit_{mid}", None)
-    ss.study_task = None
+    ss.eval_task = None
     ss.awaiting_fit = False
     st.rerun()
 
@@ -694,10 +698,10 @@ def tasks_finished() -> int:
 
 
 def render_session_end() -> None:
-    """Study mode: 'Finish the session' when no task is open, then the questionnaire."""
+    """Evaluation mode: 'Finish the session' when no task is open, then the questionnaire."""
     if ss.questionnaire == "done":
         with st.chat_message("assistant", avatar="🔮"):
-            st.success("Thank you, that's the end of the session.")
+            st.success("Thank you, that's the end of the session. Your answers are saved in the interaction log.")
         return
     if ss.questionnaire is None:
         with st.chat_message("assistant", avatar="🔮"):
@@ -737,9 +741,9 @@ if ss.pending_redo is not None:
 
 if ss.awaiting_prediction:
     render_prediction_step()
-elif ss.study_mode and ss.study_task is not None:
+elif ss.evaluation_mode and ss.eval_task is not None:
     render_task_controls()
-elif ss.study_mode:
+elif ss.evaluation_mode:
     render_session_end()
 
 typed = st.chat_input("Ask your assistant anything…", disabled=LOCKED)
@@ -748,7 +752,7 @@ ss.pending_prompt = None
 if prompt and not LOCKED:
     history = history_before(len(ss.messages))
     ss.messages.append({"role": "user", "text": prompt})
-    if ss.study_mode:
+    if ss.evaluation_mode:
         ss.awaiting_prediction = prompt            # reply is generated after the prediction
     else:
         with st.spinner("Thinking…"):

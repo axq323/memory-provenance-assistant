@@ -1,13 +1,16 @@
-"""Study instruments: ground truth and scoring for the outcomes in Assignment 1, Section 04.
+"""Evaluation mode: ground truth and scoring for the guided tasks.
+
+Evaluation mode lets the design be tested in the way Assignment 1 (Section 04)
+proposes. Each part maps to one outcome:
 
   predictive understanding  -> score_prediction(): predicted vs actually used memories
   applicability judgement   -> score_fit(): "did this memory suit your request?" vs ground truth
-  behavioural reliance      -> summarise_task() + reliance(): what the participant did with
+  behavioural reliance      -> summarise_task() + reliance(): what the user did with
                                the reply (accept, flag, correct), judged against ground truth
   self-reported attitudes   -> QUESTIONNAIRE at the end of the session, logged apart from
                                behaviour because the two can diverge (Bucinca et al., 2021)
 
-The fit question is asked AFTER the participant has reacted to the reply,
+The fit question is asked AFTER the user has reacted to the reply,
 so asking it cannot prime the behaviour that measures reliance.
 
 Ground truth comes from the annotated replay scenarios (data/replay.json):
@@ -70,7 +73,7 @@ CORRECTION_EVENTS = {"not_for_task", "memory_edited", "memory_forgotten"}
 
 
 def summarise_task(rows: list[dict], started_at: str, finished_at: str) -> dict:
-    """What the participant did between seeing the reply and finishing the task.
+    """What the user did between seeing the reply and finishing the task.
 
     rows: interaction-log rows for this session, in order, from the task's
     prediction onwards. Returns counts plus the memory ids they corrected.
@@ -85,7 +88,7 @@ def summarise_task(rows: list[dict], started_at: str, finished_at: str) -> dict:
 
 
 def reliance(misapplied_shown: set[str], fitting_shown: set[str], behaviour: dict) -> str:
-    """Was the participant's reaction appropriate (Assignment 1: accept suitable
+    """Was the user's reaction appropriate (Assignment 1: accept suitable
     personalisation, question misapplied memories)?
 
     misapplied memory in the reply -> "appropriate" if they flagged the reply or

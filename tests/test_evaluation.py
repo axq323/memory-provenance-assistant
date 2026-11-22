@@ -1,4 +1,4 @@
-from mpa.study import ground_truth, score_prediction
+from mpa.evaluation import ground_truth, score_prediction
 
 
 def test_ground_truth_for_demo_prompts():
@@ -17,7 +17,7 @@ def test_prediction_scoring():
 
 
 # ------------------------------------------------------------ Part 2 ---
-from mpa.study import reliance, score_fit, summarise_task  # noqa: E402
+from mpa.evaluation import reliance, score_fit, summarise_task  # noqa: E402
 
 BIRTHDAY_TRUTH = {"scenario": "S3-birthday", "fits": [], "misapplied": ["m2"]}
 DINNER_TRUTH = {"scenario": "S1-dinner", "fits": ["m3", "m4"], "misapplied": []}
@@ -35,7 +35,7 @@ def _row(event, memory_id=""):
     return {"event": event, "memory_id": memory_id}
 
 
-def test_task_summary_counts_what_the_participant_did():
+def test_task_summary_counts_what_the_user_did():
     rows = [_row("source_opened", "m2"), _row("source_closed", "m2"), _row("not_for_task", "m2"),
             _row("reply_shown"), _row("source_opened", "m3"), _row("reply_accepted")]
     s = summarise_task(rows, "2026-11-22T10:00:00", "2026-11-22T10:01:05")
@@ -61,7 +61,7 @@ def test_reliance_outcomes():
 
 
 # ------------------------------------------------------------ Part 3 ---
-from mpa.study import LIKERT, QUESTIONNAIRE, clean_comment  # noqa: E402
+from mpa.evaluation import LIKERT, QUESTIONNAIRE, clean_comment  # noqa: E402
 
 
 def test_questionnaire_items_are_unique_and_only_effort_is_reversed():

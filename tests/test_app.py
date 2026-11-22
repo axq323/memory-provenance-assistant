@@ -207,13 +207,13 @@ def _submit_prediction(app):
     next(b for b in app.button if b.label == "Show me the reply").click().run()
 
 
-def _study(app):
-    app.toggle(key="study_mode").set_value(True).run()
+def _evaluation(app):
+    app.toggle(key="evaluation_mode").set_value(True).run()
     return app
 
 
-def test_study_mode_asks_for_a_prediction_before_the_reply(app):
-    _study(app)
+def test_evaluation_mode_asks_for_a_prediction_before_the_reply(app):
+    _evaluation(app)
     _button(app, "Can you write a birthday message").click().run()
     assert not app.exception
     assert any("which of your memories do you expect" in m.value for m in app.markdown)
@@ -221,7 +221,7 @@ def test_study_mode_asks_for_a_prediction_before_the_reply(app):
 
 
 def test_prediction_is_logged_against_what_was_used(app, tmp_path):
-    _study(app)
+    _evaluation(app)
     _button(app, "Can you write a birthday message").click().run()
     app.checkbox(key="pred_m2").check()
     _submit_prediction(app)
@@ -234,7 +234,7 @@ def test_prediction_is_logged_against_what_was_used(app, tmp_path):
 
 
 def test_none_of_them_and_empty_prediction(app, tmp_path):
-    _study(app)
+    _evaluation(app)
     _button(app, "Can you suggest something I could make").click().run()
     _submit_prediction(app)
     assert any("Tick at least one" in w.value for w in app.warning)               # nothing ticked
@@ -245,25 +245,25 @@ def test_none_of_them_and_empty_prediction(app, tmp_path):
     assert "predicted=none;used=m3,m4;exact=False;jaccard=0.0;scenario=S1-dinner" in log
 
 
-def test_study_mode_hides_the_influence_check(app):
-    _study(app)
+def test_evaluation_mode_hides_the_influence_check(app):
+    _evaluation(app)
     _button(app, "Can you suggest something I could make").click().run()
     app.checkbox(key="pred_m3").check()
     _submit_prediction(app)
     assert not any((b.key or "").startswith("infl_") for b in app.button)
 
 
-def test_study_mode_from_url(tmp_path, monkeypatch):
+def test_evaluation_mode_from_url(tmp_path, monkeypatch):
     monkeypatch.setenv("MODE", "replay")
     monkeypatch.setenv("MPA_RUNTIME_DIR", str(tmp_path))
     at = AppTest.from_file(APP, default_timeout=30)
-    at.query_params["study"] = "1"
+    at.query_params["evaluate"] = "1"
     at.run()
-    assert at.session_state["study_mode"] is True
+    assert at.session_state["evaluation_mode"] is True
 
 
 def test_clear_chat_cancels_a_pending_prediction(app):
-    app.toggle(key="study_mode").set_value(True).run()
+    app.toggle(key="evaluation_mode").set_value(True).run()
     app.chat_input[0].set_value(DINNER).run()
     assert app.session_state["awaiting_prediction"] == DINNER
     app.button(key="clear_chat").click().run()
@@ -356,12 +356,12 @@ def test_check_can_be_run_again_on_the_same_reply(app, tmp_path):
     assert (tmp_path / "interaction_log.csv").read_text().count("influence_checked") == 2
 
 
-# ------------------------------------------------- study Part 2: reaction, then fit question ---
+# ------------------------------------------------- evaluation mode: reaction, then fit question ---
 BIRTHDAY = "Can you write a birthday message for my best friend Sam? Something warm and a bit funny."
 
 
 def _start_task(app, prompt_start, predict):
-    _study(app)
+    _evaluation(app)
     _button(app, prompt_start).click().run()
     for mid in predict:
         app.checkbox(key=f"pred_{mid}").check()
@@ -394,7 +394,7 @@ def test_flagging_a_misapplied_memory_is_appropriate_and_fit_is_scored(app, tmp_
     next(b for b in app.button if b.label == "Next task →").click().run()
     assert not app.exception
     assert "answer=no;truth=misapplied;correct=True;scenario=S3-birthday" in _log(tmp_path)
-    assert app.session_state["study_task"] is None
+    assert app.session_state["eval_task"] is None
     assert not app.chat_input[0].proto.disabled                              # next task can start
 
 
@@ -430,7 +430,7 @@ def test_every_fit_question_must_be_answered(app, tmp_path):
     next(b for b in app.button if b.label == "Next task →").click().run()
     assert any("answer every question" in w.value for w in app.warning)
     assert "fit_judged" not in _log(tmp_path)
-    assert app.session_state["study_task"] is not None
+    assert app.session_state["eval_task"] is not None
 
 
 def test_opening_a_source_is_counted_as_checking_effort(app, tmp_path):
@@ -448,25 +448,25 @@ def test_no_fit_question_when_no_memory_was_used(app, tmp_path):
     app.button(key="task_done").click().run()
     assert not app.exception
     assert "reliance=n/a" in _log(tmp_path)
-    assert app.session_state["study_task"] is None                          # closed straight away
+    assert app.session_state["eval_task"] is None                          # closed straight away
 
 
 def test_clear_chat_ends_an_open_task(app):
     _start_task(app, "Can you write a birthday message", ["m2"])
     app.button(key="clear_chat").click().run()
-    assert app.session_state["study_task"] is None and not app.session_state["awaiting_fit"]
+    assert app.session_state["eval_task"] is None and not app.session_state["awaiting_fit"]
     assert not app.chat_input[0].proto.disabled
 
 
-def test_outside_study_mode_nothing_is_locked(app):
+def test_outside_evaluation_mode_nothing_is_locked(app):
     app.chat_input[0].set_value(BIRTHDAY).run()
     assert not any(b.key == "task_done" for b in app.button)
     assert not app.chat_input[0].proto.disabled
 
 
-# ------------------------------------------------- study Part 3: questionnaire ---
+# ------------------------------------------------- evaluation mode: questionnaire ---
 def _answer_all(app, score=5):
-    from mpa.study import QUESTIONNAIRE
+    from mpa.evaluation import QUESTIONNAIRE
     for item, _, _ in QUESTIONNAIRE:
         app.radio(key=f"q_{item}").set_value(score)
 
@@ -507,7 +507,7 @@ def test_questionnaire_is_logged_separately_and_ends_the_session(app, tmp_path):
 
 
 def test_every_statement_must_be_answered(app, tmp_path):
-    _study(app)
+    _evaluation(app)
     app.button(key="finish_session").click().run()
     app.radio(key="q_trust").set_value(4)
     next(b for b in app.button if b.label == "Submit").click().run()
@@ -516,18 +516,18 @@ def test_every_statement_must_be_answered(app, tmp_path):
     assert not log_file.exists() or "questionnaire_answered" not in log_file.read_text()
 
 
-def test_new_participant_gets_a_new_session_and_fresh_state(app, tmp_path):
+def test_new_session_gets_a_new_session_and_fresh_state(app, tmp_path):
     _finish_one_task(app)
     old = app.session_state["session_id"]
     app.radio(key="condition").set_value("B").run()
-    app.button(key="new_participant").click().run()
+    app.button(key="new_session").click().run()
     assert not app.exception
     assert app.session_state["session_id"] != old
     assert app.session_state["messages"] == [] and app.session_state["questionnaire"] is None
-    rows = [r for r in _log(tmp_path).splitlines() if "participant_started" in r]
+    rows = [r for r in _log(tmp_path).splitlines() if "session_started" in r]
     assert len(rows) == 1 and app.session_state["session_id"] in rows[0] and "condition=B" in rows[0]
 
 
-def test_no_questionnaire_outside_study_mode(app):
+def test_no_questionnaire_outside_evaluation_mode(app):
     app.chat_input[0].set_value(BIRTHDAY).run()
     assert not any(b.key == "finish_session" for b in app.button)

@@ -4,7 +4,7 @@ The model *claims* which memories it used. A schema only guarantees the
 shape of that claim, not its truth, and a tool-style output
 is a proposal the system must check. So a memory chip is
 shown only if its ID was actually sent in the ContextRecord; any other
-ID is dropped and reported in the researcher view.
+ID is dropped and reported in the developer view.
 
 """
 

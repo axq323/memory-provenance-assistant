@@ -1,7 +1,7 @@
 """Context assembly: the function that decides what the model sees.
 
 The record matters twice: the validator uses it to check the model's
-claims about which memories it used, and the researcher view shows it,
+claims about which memories it used, and the developer view shows it,
 so a missing memory and an ignored memory can be told apart.
 """
 

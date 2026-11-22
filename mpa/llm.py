@@ -3,8 +3,8 @@
 ReplayModel (SIMULATED): scripted replies for the demo scenarios. The
 reply is chosen from what context assembly actually sent, so the
 user's corrections change the reply just as they would with a live
-model. Scripting also guarantees every study participant sees the same
-memory misapplication, which a live model would not.
+model. Scripting also means every demo and evaluation session sees the
+same memory misapplication, which a live model would not guarantee.
 
 LiveModel (IMPLEMENTED): any OpenAI-compatible chat endpoint, such as a
 local Ollama server (free, no key) or a hosted API with the reviewer's

@@ -1,5 +1,5 @@
 {
-  "_note": "SIMULATED model replies for replay mode. Each scenario lists the memories it could use (candidates) and one scripted reply per combination of candidates present in the context. The reply chosen depends on what context assembly actually sent, so user corrections (Not for this task, Forget) change the reply exactly as they would in live mode. Edited memory wording does not change scripted text. Each scenario also records ground truth for the planned study: which candidate memories fit the request and which would be misapplied (used by mpa/study.py to score predictions, fit judgements and reliance).",
+  "_note": "SIMULATED model replies for replay mode. Each scenario lists the memories it could use (candidates) and one scripted reply per combination of candidates present in the context. The reply chosen depends on what context assembly actually sent, so user corrections (Not for this task, Forget) change the reply exactly as they would in live mode. Edited memory wording does not change scripted text. Each scenario also records ground truth for evaluation mode: which candidate memories fit the request and which would be misapplied (used by mpa/evaluation.py to score predictions, fit judgements and reliance).",
   "scenarios": [
     {
       "id": "S1-dinner",

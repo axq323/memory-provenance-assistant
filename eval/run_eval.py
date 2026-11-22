@@ -107,6 +107,9 @@ def main() -> None:
                         help=f"system prompt version (default {PROMPT_VERSION})")
     parser.add_argument("--cases", nargs="+", help="only these case ids, e.g. E09 E11")
     args = parser.parse_args()
+    # Windows consoles and pipes may use a legacy code page: never crash on a character it lacks
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
 
     model = get_model()
     mode = "replay" if isinstance(model, ReplayModel) else "live"

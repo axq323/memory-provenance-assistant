@@ -1,4 +1,4 @@
-"""Append-only CSV log of what the user did, for the planned study.
+"""Append-only CSV log of what the user did (used by evaluation mode).
 
 Behavioural reliance (accepting a reply, opening a source, correcting a
 memory) is logged separately from anything self-reported, because the
@@ -22,7 +22,7 @@ EVENTS = {
     "reply_shown", "source_opened", "source_closed", "not_for_task", "undo_not_for_task",
     "memory_edited", "memory_forgotten", "reply_accepted", "reply_flagged", "demo_reset",
     "influence_checked", "chat_cleared", "prediction_made", "task_finished", "fit_judged",
-    "questionnaire_answered", "session_finished", "participant_started",
+    "questionnaire_answered", "session_finished", "session_started",
 }
 
 
