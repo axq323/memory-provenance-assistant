@@ -47,3 +47,43 @@ def test_redact_removes_memory_text_from_record():
     everything = str(rec.to_dict())
     assert "memory 1" not in everything
     assert "memory 2" in everything
+
+
+# ------------------------------------------------------------ prompt versions ---
+def test_v2_is_unchanged_and_shows_no_sources(store):
+    from mpa.context import SYSTEM_PROMPTS
+    assert "Use a memory only if it fits the current request." in SYSTEM_PROMPTS["v2"]
+    rec = assemble("hi", store.all(), "other", None, prompt_version="v2")
+    assert rec.messages[0]["content"] == SYSTEM_PROMPTS["v2"]
+    assert "saved from" not in rec.messages[1]["content"]
+
+
+def test_v3_adds_the_rules_without_sources(store):
+    rec = assemble("hi", store.all(), "other", None, prompt_version="v3")
+    assert "The current request comes first" in rec.messages[0]["content"]
+    assert "saved from:" not in rec.messages[1]["content"]
+    assert rec.prompt_version == "v3"
+
+
+def test_v4_shows_each_memory_with_its_source(store):
+    rec = assemble("hi", store.all(), "other", None, prompt_version="v4")
+    block = rec.messages[1]["content"]
+    assert "- [m2] You want a formal, professional tone in the messages you write. " \
+           "(saved from: Work email: asking my manager for an extension)" in block
+    assert "Each memory shows where it was" in rec.messages[0]["content"]
+
+
+def test_record_keeps_the_source_and_forgetting_removes_it(store):
+    rec = assemble("hi", store.all(), "other", None, prompt_version="v4")
+    assert next(m for m in rec.memories_sent if m["id"] == "m2")["source"].startswith("Work email")
+    rec.redact_memory("m2")
+    m2 = next(m for m in rec.memories_sent if m["id"] == "m2")
+    assert m2["text"] == "[forgotten]" and "source" not in m2
+    assert "Work email" not in rec.messages[1]["content"]
+
+
+def test_store_lists_memories_with_source_titles_but_does_not_save_them(store, tmp_path):
+    import json
+    assert store.all()[0]["source_title"].startswith("Essay revision")
+    store.edit("m1", "You prefer bullet points for essay feedback.")
+    assert "source_title" not in json.loads((tmp_path / "memories.json").read_text())[0]

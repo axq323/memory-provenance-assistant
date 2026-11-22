@@ -34,7 +34,16 @@ class MemoryStore:
 
     # ---- reading -------------------------------------------------------
     def all(self) -> list[dict]:
-        return [dict(m) for m in self._memories]
+        """Copies of the memories, each with the title of the conversation it came from
+        (source_title), so context assembly can show provenance to the model (prompt v4)."""
+        out = []
+        for m in self._memories:
+            m = dict(m)
+            src = self.sources.get(m.get("source_id"))
+            if src:
+                m["source_title"] = src["title"]
+            out.append(m)
+        return out
 
     def get(self, memory_id: str) -> dict | None:
         for m in self._memories:

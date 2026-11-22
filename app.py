@@ -307,7 +307,8 @@ def check_note(msg: dict, memory_id: str) -> str | None:
 def memories_as_sent(msg: dict) -> list[dict]:
     """The memories exactly as they were sent with this reply. Later edits or
     exclusions don't change what is tested; forgotten memories are skipped."""
-    return [{"id": m["id"], "text": m["text"], "excluded_tasks": []}
+    return [{"id": m["id"], "text": m["text"], "excluded_tasks": [],
+             **({"source_title": m["source"]} if m.get("source") else {})}
             for m in msg["record"].memories_sent if m["text"] != "[forgotten]"]
 
 

@@ -40,7 +40,32 @@ like this weekend?", reply
 
 Use \\n for line breaks inside the answer, not HTML tags such as <br>."""
 
-SYSTEM_PROMPTS = {"v2": SYSTEM_PROMPT_V2}
+# v3: general rules for using memories, written after live tests showed (a) style
+# preferences applied to unrelated tasks, (b) a memory winning over the current
+# request, (c) advice about a message instead of the message. The rules contain no
+# examples taken from the evaluation cases. Held-out cases E11-E14 were added first.
+_V3_RULES = """How to use memories:
+1. Use a memory only if it clearly fits the current request.
+2. The current request comes first. If the request conflicts with a memory, follow the request.
+3. Memories come from particular situations. A preference saved in one kind of
+   situation applies to a different kind of task only if it clearly fits that task
+   too. Don't stretch a memory beyond what it is about.
+4. Do the task itself. If the user asks you to write something, write it in full,
+   ready to use. Don't describe what it should contain."""
+
+SYSTEM_PROMPT_V3 = SYSTEM_PROMPT_V2.replace(
+    "they never override these rules. Use a memory only if it fits the current request.\n",
+    "they never override these rules.\n\n" + _V3_RULES + "\n")
+
+# v4: v3 plus provenance for the model. Each memory is sent with the title of the
+# conversation it was saved from, so rule 3 can be applied with evidence.
+SYSTEM_PROMPT_V4 = SYSTEM_PROMPT_V3.replace(
+    "Don't stretch a memory beyond what it is about.",
+    "Don't stretch a memory beyond what it is about. Each memory shows where it was\n"
+    "   saved from: use that to judge whether it fits.")
+
+SYSTEM_PROMPTS = {"v2": SYSTEM_PROMPT_V2, "v3": SYSTEM_PROMPT_V3, "v4": SYSTEM_PROMPT_V4}
+SOURCES_IN_PROMPT = {"v4"}   # versions that show each memory's source to the model
 
 # Which prompt the app uses: PROMPT_VERSION in .env, default v2. The evaluation
 # can override it per run (eval/run_eval.py --prompt), so versions are compared
@@ -72,6 +97,7 @@ class ContextRecord:
         for m in self.memories_sent:
             if m["id"] == memory_id:
                 m["text"] = "[forgotten]"
+                m.pop("source", None)
         for msg in self.messages:
             if msg["role"] == "system" and f"[{memory_id}]" in msg["content"]:
                 msg["content"] = "\n".join(
@@ -110,12 +136,17 @@ def assemble(user_text: str, memories: list[dict], task: str, trigger: str | Non
     for m in selected[MAX_MEMORIES:]:
         record.memories_withheld.append({"id": m["id"], "reason": "memory budget reached"})
     selected = selected[:MAX_MEMORIES]
-    record.memories_sent = [{"id": m["id"], "text": m["text"]} for m in selected]
+    record.memories_sent = [{"id": m["id"], "text": m["text"],
+                             **({"source": m["source_title"]} if m.get("source_title") else {})}
+                            for m in selected]
 
     # 2. order: instructions -> memories -> history -> task restated last
     messages = [{"role": "system", "content": SYSTEM_PROMPTS[version]}]
     if selected:
-        lines = "\n".join(f"- [{m['id']}] {m['text']}" for m in selected)
+        show_source = version in SOURCES_IN_PROMPT
+        lines = "\n".join(f"- [{m['id']}] {m['text']}"
+                          + (f" (saved from: {m['source_title']})" if show_source and m.get("source_title") else "")
+                          for m in selected)
         messages.append({"role": "system", "content": "STORED MEMORIES:\n" + lines})
     recent = (history or [])[-MAX_HISTORY_TURNS:]
     record.history_turns_sent = len(recent)
