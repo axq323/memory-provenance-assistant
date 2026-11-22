@@ -14,3 +14,47 @@ def test_prediction_scoring():
     assert score_prediction({"m3"}, {"m3", "m4"}) == {"exact": False, "jaccard": 0.5}
     assert score_prediction(set(), set()) == {"exact": True, "jaccard": 1.0}     # "none of them", correctly
     assert score_prediction({"m1"}, set()) == {"exact": False, "jaccard": 0.0}
+
+
+# ------------------------------------------------------------ Part 2 ---
+from mpa.study import reliance, score_fit, summarise_task  # noqa: E402
+
+BIRTHDAY_TRUTH = {"scenario": "S3-birthday", "fits": [], "misapplied": ["m2"]}
+DINNER_TRUTH = {"scenario": "S1-dinner", "fits": ["m3", "m4"], "misapplied": []}
+
+
+def test_fit_scoring_against_ground_truth():
+    assert score_fit("no", "m2", BIRTHDAY_TRUTH) == {"truth": "misapplied", "correct": True, "unsure": False}
+    assert score_fit("yes", "m2", BIRTHDAY_TRUTH)["correct"] is False
+    assert score_fit("yes", "m3", DINNER_TRUTH)["correct"] is True
+    assert score_fit("unsure", "m3", DINNER_TRUTH) == {"truth": "fits", "correct": False, "unsure": True}
+    assert score_fit("yes", "m1", None) == {"truth": "unknown", "correct": None, "unsure": False}
+
+
+def _row(event, memory_id=""):
+    return {"event": event, "memory_id": memory_id}
+
+
+def test_task_summary_counts_what_the_participant_did():
+    rows = [_row("source_opened", "m2"), _row("source_closed", "m2"), _row("not_for_task", "m2"),
+            _row("reply_shown"), _row("source_opened", "m3"), _row("reply_accepted")]
+    s = summarise_task(rows, "2026-11-22T10:00:00", "2026-11-22T10:01:05")
+    assert s == {"accepted": True, "flagged": False, "corrected": ["m2"], "sources_opened": 2, "seconds": 65}
+
+
+def _b(accepted=False, flagged=False, corrected=()):
+    return {"accepted": accepted, "flagged": flagged, "corrected": list(corrected)}
+
+
+def test_reliance_outcomes():
+    # misapplied memory in the reply: questioning it is appropriate
+    assert reliance({"m2"}, set(), _b(flagged=True)) == "appropriate"
+    assert reliance({"m2"}, set(), _b(corrected=["m2"])) == "appropriate"
+    assert reliance({"m2"}, set(), _b(accepted=True)) == "over-reliance"
+    assert reliance({"m2"}, set(), _b()) == "over-reliance"                     # did nothing
+    assert reliance({"m2"}, set(), _b(corrected=["m3"])) == "over-reliance"     # corrected the wrong memory
+    # only fitting memories: accepting is appropriate, questioning them is under-reliance
+    assert reliance(set(), {"m3", "m4"}, _b(accepted=True)) == "appropriate"
+    assert reliance(set(), {"m3", "m4"}, _b(corrected=["m4"])) == "under-reliance"
+    assert reliance(set(), {"m3", "m4"}, _b(flagged=True)) == "under-reliance"
+    assert reliance(set(), set(), _b()) == "n/a"

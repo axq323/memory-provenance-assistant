@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -17,10 +18,10 @@ load_dotenv()
 from mpa.context import assemble  # noqa: E402
 from mpa.counterfactual import JUDGE_PROMPT_VERSION, calls_needed, check_influence, summarise  # noqa: E402
 from mpa.display import tame_headings  # noqa: E402
-from mpa.interaction_log import log_event  # noqa: E402
+from mpa.interaction_log import log_event, read_log  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
-from mpa.study import ground_truth, score_prediction  # noqa: E402
+from mpa.study import FIT_ANSWERS, ground_truth, reliance, score_fit, score_prediction, summarise_task  # noqa: E402
 from mpa.task_types import LABELS, classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
 
@@ -58,6 +59,10 @@ ss.setdefault("influence_check", True)  # show the counterfactual check (turn of
 # A researcher can switch it on per participant with ?study=1 in the URL.
 ss.setdefault("study_mode", st.query_params.get("study", "0") == "1")
 ss.setdefault("awaiting_prediction", None)  # prompt waiting for the participant's prediction
+# A study task runs from the prediction to the fit question: {"msg_index", "turn_id", "started"}.
+# While it is open the participant reacts freely; new prompts are locked until it is finished.
+ss.setdefault("study_task", None)
+ss.setdefault("awaiting_fit", False)
 # Study condition: A = memories with source context, B = memories only.
 # A researcher can fix it per participant with ?condition=B in the URL.
 ss.setdefault("condition", "B" if st.query_params.get("condition", "A").upper() == "B" else "A")
@@ -203,6 +208,8 @@ def reset_demo() -> None:
     ss.open_sources = set()
     ss.awaiting_prediction = None
     ss.pending_redo = None
+    ss.study_task = None
+    ss.awaiting_fit = False
     log("demo_reset")
     ss.flash.append("Demo reset: memories restored and chat cleared.")
 
@@ -213,8 +220,53 @@ def clear_chat() -> None:
     ss.open_sources = set()
     ss.awaiting_prediction = None
     ss.pending_redo = None
+    ss.study_task = None
+    ss.awaiting_fit = False
     log("chat_cleared")
     ss.flash.append("Chat cleared. Your memories and corrections are kept.")
+
+
+def _now() -> str:
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _task_rows(turn_id: str) -> list[dict]:
+    """This session's log rows after the task's prediction was made."""
+    rows = [r for r in read_log(RUNTIME / "interaction_log.csv") if r["session_id"] == ss.session_id]
+    start = max((i for i, r in enumerate(rows)
+                 if r["event"] == "prediction_made" and r["turn_id"] == turn_id), default=-1)
+    return rows[start + 1:]
+
+
+def finish_task() -> None:
+    """Study mode: the participant has finished reacting to the reply. Log what they
+    did (behavioural reliance), then ask the fit question about the memories used."""
+    task = ss.study_task
+    msg = ss.messages[task["msg_index"]]
+    used = {u["id"] for u in msg["reply"].used}
+    truth = ground_truth(msg["user_text"])
+    behaviour = summarise_task(_task_rows(task["turn_id"]), task["started"], _now())
+    misapplied = used & set(truth["misapplied"]) if truth else set()
+    fitting = used & set(truth["fits"]) if truth else set()
+    outcome = reliance(misapplied, fitting, behaviour)
+    msg["task_summary"] = {**behaviour, "reliance": outcome}
+    log("task_finished", turn_id=task["turn_id"], task=msg["task"],
+        detail=f"scenario={truth['scenario'] if truth else 'unknown'};"
+               f"accepted={behaviour['accepted']};flagged={behaviour['flagged']};"
+               f"corrected={','.join(behaviour['corrected']) or 'none'};"
+               f"sources_opened={behaviour['sources_opened']};seconds={behaviour['seconds']};"
+               f"misapplied_shown={','.join(sorted(misapplied)) or 'none'};reliance={outcome}")
+    if fit_questions(msg):
+        ss.awaiting_fit = True
+    else:                                   # no memory was used, so there is nothing to judge
+        ss.study_task = None
+
+
+def fit_questions(msg: dict) -> list[dict]:
+    """The memories the fit question asks about: those the assistant used in the
+    reply the participant reacted to, worded as they were sent (forgotten ones skipped)."""
+    used = {u["id"] for u in msg["reply"].used}
+    return [m for m in msg["record"].memories_sent if m["id"] in used and m["text"] != "[forgotten]"]
 
 
 # ------------------------------------------------------------ rendering ---
@@ -427,6 +479,15 @@ def render_record(msg: dict) -> None:
             p = msg["prediction"]
             st.markdown(f"- **Participant predicted:** {', '.join(p['predicted']) or 'none'} "
                         f"(exact match: {p['exact']}, overlap: {p['jaccard']})")
+        if msg.get("task_summary"):
+            t = msg["task_summary"]
+            st.markdown(f"- **Reaction:** accepted {t['accepted']}, flagged {t['flagged']}, "
+                        f"corrected {', '.join(t['corrected']) or 'nothing'}, "
+                        f"sources opened {t['sources_opened']}, {t['seconds']} s → **{t['reliance']}**")
+        if msg.get("fit"):
+            st.markdown("- **Fit answers:** " + "; ".join(
+                f"{mid}: {f['answer']} (truth: {f['truth']}, correct: {f['correct']})"
+                for mid, f in msg["fit"].items()))
         st.markdown("**Memories sent**")
         st.json(rec.memories_sent, expanded=True)
         if rec.memories_withheld:
@@ -473,6 +534,8 @@ def render_memory_panel() -> None:
 
 # ---------------------------------------------------------------- page ---
 SHOW_SOURCES = ss.condition == "A"
+# In study mode a new prompt waits until the current task (prediction -> reply -> fit) is finished.
+LOCKED = bool(ss.awaiting_prediction) or (ss.study_mode and ss.study_task is not None)
 for note in ss.flash:
     st.toast(note)
 ss.flash = []
@@ -511,7 +574,7 @@ if MODE == "replay":
     for col, scenario in zip(cols, model.scenarios):
         col.button(scenario["prompt"], key=f"demo_{scenario['id']}", on_click=queue_prompt,
                    args=(scenario["prompt"],), use_container_width=True,
-                   disabled=bool(ss.awaiting_prediction))
+                   disabled=LOCKED)
 
 for i, msg in enumerate(ss.messages):
     if msg["role"] == "notice":
@@ -563,6 +626,45 @@ def render_prediction_step() -> None:
     for key in [f"pred_{m['id']}" for m in memories] + ["pred_none"]:
         ss.pop(key, None)
     ss.awaiting_prediction = None
+    ss.study_task = {"msg_index": len(ss.messages) - 1, "turn_id": reply_msg["turn_id"], "started": _now()}
+    st.rerun()
+
+
+def render_task_controls() -> None:
+    """Study mode, after the reply: free reaction first, then the fit question."""
+    task = ss.study_task
+    msg = ss.messages[task["msg_index"]]
+    if not ss.awaiting_fit:
+        with st.chat_message("assistant", avatar="🔮"):
+            st.markdown("Use the reply however you would normally: accept it, flag it, open sources "
+                        "or correct a memory. When you've finished with it, continue.")
+            st.button("I'm done with this reply →", key="task_done", on_click=finish_task, type="primary")
+        return
+    questions = fit_questions(msg)
+    with st.chat_message("assistant", avatar="🔮"):
+        with st.form("fit_form"):
+            st.markdown(f"**One last question about your request:** “{msg['user_text']}”")
+            for m in questions:
+                st.radio(f"The assistant used this memory: “{m['text'].rstrip('.')}”. Did it suit your request?",
+                         list(FIT_ANSWERS), format_func=FIT_ANSWERS.get, index=None, key=f"fit_{m['id']}")
+            submitted = st.form_submit_button("Next task →")
+    if not submitted:
+        return
+    answers = {m["id"]: ss.get(f"fit_{m['id']}") for m in questions}
+    if any(a is None for a in answers.values()):
+        st.warning("Please answer every question.")
+        return
+    truth = ground_truth(msg["user_text"])
+    msg["fit"] = {}
+    for mid, answer in answers.items():
+        score = score_fit(answer, mid, truth)
+        msg["fit"][mid] = {"answer": answer, **score}
+        log("fit_judged", turn_id=task["turn_id"], task=msg["task"], memory_id=mid,
+            detail=f"answer={answer};truth={score['truth']};correct={score['correct']};"
+                   f"scenario={truth['scenario'] if truth else 'unknown'}")
+        ss.pop(f"fit_{mid}", None)
+    ss.study_task = None
+    ss.awaiting_fit = False
     st.rerun()
 
 
@@ -572,11 +674,13 @@ if ss.pending_redo is not None:
 
 if ss.awaiting_prediction:
     render_prediction_step()
+elif ss.study_mode and ss.study_task is not None:
+    render_task_controls()
 
-typed = st.chat_input("Ask your assistant anything…", disabled=bool(ss.awaiting_prediction))
+typed = st.chat_input("Ask your assistant anything…", disabled=LOCKED)
 prompt = typed or ss.pending_prompt
 ss.pending_prompt = None
-if prompt and not ss.awaiting_prediction:
+if prompt and not LOCKED:
     history = history_before(len(ss.messages))
     ss.messages.append({"role": "user", "text": prompt})
     if ss.study_mode:

@@ -354,3 +354,111 @@ def test_check_can_be_run_again_on_the_same_reply(app, tmp_path):
     app.button(key=f"infl_{turn}").click().run()
     assert not app.exception
     assert (tmp_path / "interaction_log.csv").read_text().count("influence_checked") == 2
+
+
+# ------------------------------------------------- study Part 2: reaction, then fit question ---
+BIRTHDAY = "Can you write a birthday message for my best friend Sam? Something warm and a bit funny."
+
+
+def _start_task(app, prompt_start, predict):
+    _study(app)
+    _button(app, prompt_start).click().run()
+    for mid in predict:
+        app.checkbox(key=f"pred_{mid}").check()
+    if not predict:
+        app.checkbox(key="pred_none").check()
+    _submit_prediction(app)
+    assert not app.exception
+    return _assistant(app)[0]
+
+
+def _log(tmp_path):
+    return (tmp_path / "interaction_log.csv").read_text()
+
+
+def test_new_prompts_wait_until_the_task_is_finished(app):
+    _start_task(app, "Can you write a birthday message", ["m2"])
+    assert app.chat_input[0].proto.disabled
+    assert all(b.disabled for b in app.button if (b.key or "").startswith("demo_"))
+    assert any(b.key == "task_done" for b in app.button)
+    assert not any("Did it suit your request" in r.label for r in app.radio)   # not asked yet
+
+
+def test_flagging_a_misapplied_memory_is_appropriate_and_fit_is_scored(app, tmp_path):
+    msg = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"flag_{msg['turn_id']}").click().run()
+    app.button(key="task_done").click().run()
+    assert "task_finished" in _log(tmp_path) and "reliance=appropriate" in _log(tmp_path)
+    assert "misapplied_shown=m2" in _log(tmp_path)
+    app.radio(key="fit_m2").set_value("no")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    assert not app.exception
+    assert "answer=no;truth=misapplied;correct=True;scenario=S3-birthday" in _log(tmp_path)
+    assert app.session_state["study_task"] is None
+    assert not app.chat_input[0].proto.disabled                              # next task can start
+
+
+def test_accepting_a_misapplied_memory_is_over_reliance(app, tmp_path):
+    msg = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"ok_{msg['turn_id']}").click().run()
+    app.button(key="task_done").click().run()
+    assert "accepted=True;flagged=False;corrected=none" in _log(tmp_path)
+    assert "reliance=over-reliance" in _log(tmp_path)
+
+
+def test_correcting_the_memory_counts_and_the_fit_question_is_about_the_original_reply(app, tmp_path):
+    msg = _start_task(app, "Can you write a birthday message", [])
+    app.button(key=f"nft_{msg['turn_id']}:m2").click().run()                 # rewritten without m2
+    assert len(_assistant(app)) == 2
+    app.button(key="task_done").click().run()
+    assert "corrected=m2" in _log(tmp_path) and "reliance=appropriate" in _log(tmp_path)
+    assert any("You want a formal, professional tone" in r.label for r in app.radio)
+
+
+def test_accepting_fitting_memories_is_appropriate_and_both_are_asked_about(app, tmp_path):
+    msg = _start_task(app, "Can you suggest something I could make", ["m3", "m4"])
+    app.button(key=f"ok_{msg['turn_id']}").click().run()
+    app.button(key="task_done").click().run()
+    assert "reliance=appropriate" in _log(tmp_path)
+    assert {r.key for r in app.radio if (r.key or "").startswith("fit_")} == {"fit_m3", "fit_m4"}
+
+
+def test_every_fit_question_must_be_answered(app, tmp_path):
+    _start_task(app, "Can you suggest something I could make", ["m3", "m4"])
+    app.button(key="task_done").click().run()
+    app.radio(key="fit_m3").set_value("yes")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    assert any("answer every question" in w.value for w in app.warning)
+    assert "fit_judged" not in _log(tmp_path)
+    assert app.session_state["study_task"] is not None
+
+
+def test_opening_a_source_is_counted_as_checking_effort(app, tmp_path):
+    msg = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"src_{msg['turn_id']}:m2").click().run()
+    app.button(key="task_done").click().run()
+    assert "sources_opened=1" in _log(tmp_path)
+
+
+def test_no_fit_question_when_no_memory_was_used(app, tmp_path):
+    app.selectbox(key="nft_pick_m2").set_value("personal_message").run()      # m2 restricted beforehand
+    app.button(key="nft_apply_m2").click().run()
+    msg = _start_task(app, "Can you write a birthday message", [])
+    assert msg["reply"].used == []
+    app.button(key="task_done").click().run()
+    assert not app.exception
+    assert "reliance=n/a" in _log(tmp_path)
+    assert app.session_state["study_task"] is None                          # closed straight away
+
+
+def test_clear_chat_ends_an_open_task(app):
+    _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key="clear_chat").click().run()
+    assert app.session_state["study_task"] is None and not app.session_state["awaiting_fit"]
+    assert not app.chat_input[0].proto.disabled
+
+
+def test_outside_study_mode_nothing_is_locked(app):
+    app.chat_input[0].set_value(BIRTHDAY).run()
+    assert not any(b.key == "task_done" for b in app.button)
+    assert not app.chat_input[0].proto.disabled
