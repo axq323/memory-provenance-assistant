@@ -1,0 +1,111 @@
+timestamp,session_id,condition,mode,turn_id,task,event,memory_id,detail
+2026-11-17T06:42:59,470484,A,replay,f7016cc8,cooking,reply_shown,,"used=m3,m4"
+2026-11-19T22:18:47,499630,A,replay,f5f11044,cooking,reply_shown,,"used=m3,m4"
+2026-11-19T22:18:59,499630,A,replay,540d8731,explain,reply_shown,,used=m1
+2026-11-19T22:19:00,499630,A,replay,c23a889b,explain,reply_shown,,used=m1
+2026-11-19T22:19:06,499630,A,replay,90a86b02,personal_message,reply_shown,,used=m2
+2026-11-19T22:19:13,499630,A,replay,90a86b02,personal_message,reply_flagged,,used=m2
+2026-11-19T22:19:17,499630,A,replay,c23a889b,explain,reply_accepted,,used=m1
+2026-11-19T22:19:21,499630,A,replay,90a86b02,,source_opened,m2,
+2026-11-19T22:19:25,499630,A,replay,90a86b02,personal_message,not_for_task,m2,
+2026-11-19T22:19:25,499630,A,replay,d8647b4e,personal_message,reply_shown,,used=
+2026-11-19T22:21:10,d22b75,A,live,db95b89d,personal_message,reply_shown,,used=
+2026-11-19T22:21:44,d22b75,A,live,,,source_opened,m4,
+2026-11-19T22:25:45,d22b75,A,live,d343d35f,other,reply_shown,,used=
+2026-11-19T22:26:03,d22b75,A,live,c051ac20,other,reply_shown,,used=
+2026-11-21T07:18:10,e25ee7,A,replay,19cfca58,cooking,reply_shown,,"used=m3,m4"
+2026-11-21T07:18:15,e25ee7,A,replay,19cfca58,cooking,influence_checked,,m1=agrees;m2=agrees;m3=agrees;m4=agrees
+2026-11-21T07:18:29,e25ee7,A,replay,19cfca58,,source_opened,m3,
+2026-11-21T07:18:32,e25ee7,A,replay,19cfca58,,source_closed,m3,
+2026-11-21T07:20:35,ed6979,A,live,f10bd4c6,personal_message,reply_shown,,used=m1
+2026-11-21T07:38:51,93ec1f,A,live,b81c93fb,personal_message,reply_shown,,used=m1
+2026-11-21T19:57:26,8208d4,A,live,aa9ad1dd,cooking,reply_shown,,used=
+2026-11-21T20:00:12,8208d4,A,live,aa9ad1dd,cooking,influence_checked,,m1=unreported influence;m2=unreported influence;m3=agrees;m4=unreported influence
+2026-11-22T03:15:39,8fa327,A,live,c3e91765,personal_message,reply_shown,,used=
+2026-11-22T03:24:43,8fa327,A,live,c3e91765,personal_message,influence_checked,,m1=unreported influence;m3=agrees;m4=agrees
+2026-11-22T03:28:12,8fa327,A,live,7a885740,cooking,reply_shown,,used=m4
+2026-11-22T03:31:47,8fa327,A,live,7a885740,cooking,influence_checked,,m1=unreported influence;m2=unreported influence;m3=unreported influence;m4=agrees
+2026-11-22T03:35:15,8fa327,A,live,,,demo_reset,,
+2026-11-22T03:36:22,8fa327,A,live,f742717a,personal_message,reply_shown,,used=m2
+2026-11-22T03:38:22,8fa327,A,live,f742717a,personal_message,influence_checked,,m1=agrees;m2=agrees;m3=agrees;m4=unreported influence
+2026-11-22T03:44:26,8fa327,A,live,37067f5b,personal_message,reply_shown,,used=
+2026-11-22T03:47:06,8fa327,A,live,,,source_opened,m2,
+2026-11-22T03:50:28,8fa327,A,live,79b27f79,personal_message,reply_shown,,used=
+2026-11-22T03:51:30,8fa327,A,live,5edb6bfe,personal_message,reply_shown,,used=
+2026-11-22T03:51:47,8fa327,A,live,ce60eb03,personal_message,reply_shown,,used=
+2026-11-22T03:52:00,8fa327,A,live,99d1a407,personal_message,reply_shown,,used=
+2026-11-22T06:31:10,2f9747,A,live,,,source_opened,m1,
+2026-11-22T06:31:29,2f9747,A,live,,,source_closed,m1,
+2026-11-22T06:33:31,9046d6,A,live,580a3ce7,personal_message,reply_shown,,used=m2
+2026-11-22T06:33:47,9046d6,A,live,580a3ce7,,source_opened,m2,
+2026-11-22T06:33:54,9046d6,A,live,580a3ce7,,source_closed,m2,
+2026-11-22T06:34:18,9046d6,A,live,bc840877,personal_message,reply_shown,,used=
+2026-11-22T06:34:32,9046d6,A,live,1fb5884b,personal_message,reply_shown,,used=
+2026-11-22T06:34:58,9046d6,A,live,6d0a05dd,personal_message,reply_shown,,"used=m1,m2"
+2026-11-22T06:35:41,9046d6,A,live,11b3aa46,personal_message,reply_shown,,used=
+2026-11-22T06:35:46,9046d6,A,live,6d0a05dd,,source_opened,m1,
+2026-11-22T06:35:49,9046d6,A,live,6d0a05dd,,source_closed,m1,
+2026-11-22T06:36:11,9046d6,A,live,e4e02f7d,personal_message,reply_shown,,used=
+2026-11-22T06:39:10,9046d6,A,live,,,chat_cleared,,
+2026-11-22T06:40:02,9046d6,A,live,a5d63efc,personal_message,reply_shown,,used=
+2026-11-22T06:42:30,9046d6,A,live,a5d63efc,personal_message,influence_checked,,m1=unreported influence;m2=unreported influence;m3=unreported influence;m4=agrees
+2026-11-22T06:45:40,9046d6,A,live,,,source_opened,m2,
+2026-11-22T06:47:39,9046d6,A,live,3f935e25,work_writing,reply_shown,,used=
+2026-11-22T06:48:04,9046d6,A,live,47e23311,personal_message,reply_shown,,used=m1
+2026-11-22T06:48:07,9046d6,A,live,47e23311,personal_message,not_for_task,m1,
+2026-11-22T06:48:15,9046d6,A,live,47e23311,personal_message,not_for_task,m1,
+2026-11-22T06:48:47,9046d6,A,live,d5fb975b,personal_message,reply_shown,,used=m2
+2026-11-22T06:49:38,9046d6,A,live,d5fb975b,personal_message,not_for_task,m2,
+2026-11-22T06:49:53,9046d6,A,live,99d7e784,personal_message,reply_shown,,used=
+2026-11-22T06:51:52,9046d6,A,live,e42f456e,work_writing,reply_shown,,used=m4
+2026-11-22T06:57:07,9046d6,A,live,e42f456e,work_writing,influence_checked,,m1=unreported influence;m2=unreported influence;m3=unreported influence;m4=agrees
+2026-11-22T07:03:50,68cb06,A,live,,,chat_cleared,,
+2026-11-22T07:05:22,68cb06,A,live,c6a49acc,work_writing,reply_shown,,used=
+2026-11-22T07:09:20,68cb06,A,live,c6a49acc,work_writing,influence_checked,,m1=agrees;m2=agrees;m3=agrees;m4=agrees
+2026-11-22T16:31:33,6bb86f,A,live,,personal_message,undo_not_for_task,m2,from memory panel
+2026-11-22T16:32:06,6bb86f,A,live,ab0c5329,personal_message,reply_shown,,used=m2
+2026-11-22T16:32:06,6bb86f,A,live,ab0c5329,personal_message,prediction_made,,predicted=none;used=m2;exact=False;jaccard=0.0;scenario=unknown
+2026-11-22T16:32:15,6bb86f,A,live,ab0c5329,personal_message,not_for_task,m2,
+2026-11-22T16:32:26,6bb86f,A,live,585d3457,personal_message,reply_shown,,used=
+2026-11-22T16:32:58,6bb86f,A,live,585d3457,personal_message,reply_accepted,,used=
+2026-11-22T17:56:34,dc90c7,A,live,,,chat_cleared,,
+2026-11-22T17:57:58,dc90c7,A,live,c75bc56c,personal_message,reply_shown,,used=
+2026-11-22T18:06:07,dc90c7,A,live,c75bc56c,personal_message,influence_checked,,m3=agrees;m4=agrees
+2026-11-22T18:12:27,dc90c7,A,live,,personal_message,undo_not_for_task,m1,from memory panel
+2026-11-22T18:12:29,dc90c7,A,live,,personal_message,undo_not_for_task,m2,from memory panel
+2026-11-22T18:13:33,dc90c7,A,live,,,chat_cleared,,
+2026-11-22T18:13:58,dc90c7,A,live,586cfd22,personal_message,reply_shown,,used=
+2026-11-22T18:20:41,dc90c7,A,live,586cfd22,personal_message,influence_checked,,m1=agrees;m2=agrees;m3=agrees;m4=agrees
+2026-11-22T19:30:20,d6d820,A,live,,,chat_cleared,,
+2026-11-22T19:31:05,d6d820,A,live,11584bc1,personal_message,reply_shown,,used=
+2026-11-22T19:34:09,d6d820,A,live,11584bc1,personal_message,influence_checked,,m1=agrees;m2=agrees;m3=agrees;m4=agrees;judge=qwen2.5:7b/j2
+2026-11-22T19:44:15,42ffcd,A,live,622260f2,personal_message,reply_shown,,used=
+2026-11-22T19:48:06,42ffcd,A,live,622260f2,personal_message,influence_checked,,m1=agrees;m2=agrees;m3=agrees;m4=agrees;judge=qwen2.5:7b/j2
+2026-11-22T19:50:22,42ffcd,A,live,622260f2,personal_message,influence_checked,,m1=agrees;m2=agrees;m3=agrees;m4=agrees;judge=qwen2.5:7b/j2
+2026-11-22T19:56:33,559c99,A,live,6df7ad51,personal_message,reply_shown,,used=
+2026-11-22T20:10:17,559c99,A,live,6df7ad51,personal_message,influence_checked,,m1=unreported influence;m2=agrees;m3=agrees;m4=agrees;judge=qwen2.5:7b/j3
+2026-11-22T20:12:16,559c99,A,live,,,chat_cleared,,
+2026-11-22T20:12:44,559c99,A,live,15300f3d,work_writing,reply_shown,,used=
+2026-11-22T20:16:49,559c99,A,live,15300f3d,work_writing,influence_checked,,"m1=agrees;m2=fits, no difference;m3=agrees;m4=agrees;judge=qwen2.5:7b/j3"
+2026-11-23T01:34:39,1e1a09,A,replay,d6a837d4,personal_message,reply_shown,,used=m2
+2026-11-23T01:34:41,1e1a09,A,replay,d6a837d4,personal_message,reply_flagged,,used=m2
+2026-11-23T01:35:20,1e1a09,A,replay,,,chat_cleared,,
+2026-11-23T01:35:38,4e7ee0,A,replay,04b66215,personal_message,reply_shown,,used=m2
+2026-11-23T01:35:38,4e7ee0,A,replay,04b66215,personal_message,prediction_made,,predicted=none;used=m2;exact=False;jaccard=0.0;scenario=S3-birthday
+2026-11-23T01:35:44,4e7ee0,A,replay,04b66215,personal_message,reply_flagged,,used=m2
+2026-11-23T01:36:36,4e7ee0,A,replay,04b66215,,source_opened,m2,
+2026-11-23T01:37:15,4e7ee0,A,replay,04b66215,personal_message,task_finished,,scenario=S3-birthday;accepted=False;flagged=True;corrected=none;sources_opened=1;seconds=97;misapplied_shown=m2;reliance=appropriate
+2026-11-23T01:37:24,4e7ee0,A,replay,04b66215,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday
+2026-11-23T01:37:43,4e7ee0,A,replay,04b66215,,source_closed,m2,
+2026-11-23T01:45:39,b8c510,A,replay,78ebd171,personal_message,reply_shown,,used=m2
+2026-11-23T01:45:39,b8c510,A,replay,78ebd171,personal_message,prediction_made,,predicted=none;used=m2;exact=False;jaccard=0.0;scenario=S3-birthday
+2026-11-23T01:45:57,b8c510,A,replay,78ebd171,personal_message,reply_flagged,,used=m2
+2026-11-23T01:46:18,b8c510,A,replay,78ebd171,personal_message,task_finished,,scenario=S3-birthday;accepted=False;flagged=True;corrected=none;sources_opened=0;seconds=39;misapplied_shown=m2;reliance=appropriate
+2026-11-23T01:46:26,b8c510,A,replay,78ebd171,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday
+2026-11-23T01:50:36,b8c510,A,replay,,,questionnaire_answered,,item=trust;score=2;reverse=False
+2026-11-23T01:50:36,b8c510,A,replay,,,questionnaire_answered,,item=understanding;score=2;reverse=False
+2026-11-23T01:50:36,b8c510,A,replay,,,questionnaire_answered,,item=predictability;score=1;reverse=False
+2026-11-23T01:50:36,b8c510,A,replay,,,questionnaire_answered,,item=control;score=3;reverse=False
+2026-11-23T01:50:36,b8c510,A,replay,,,questionnaire_answered,,item=effort;score=1;reverse=True
+2026-11-23T01:50:36,b8c510,A,replay,,,questionnaire_answered,,item=comfort;score=7;reverse=False
+2026-11-23T01:50:36,b8c510,A,replay,,,session_finished,,tasks=1

@@ -4,7 +4,8 @@
   applicability judgement   -> score_fit(): "did this memory suit your request?" vs ground truth
   behavioural reliance      -> summarise_task() + reliance(): what the participant did with
                                the reply (accept, flag, correct), judged against ground truth
-  self-reported trust       -> end-of-session questionnaire, kept apart       (Part 3)
+  self-reported attitudes   -> QUESTIONNAIRE at the end of the session, logged apart from
+                               behaviour because the two can diverge (Bucinca et al., 2021)
 
 The fit question is asked AFTER the participant has reacted to the reply,
 so asking it cannot prime the behaviour that measures reliance.
@@ -101,3 +102,27 @@ def reliance(misapplied_shown: set[str], fitting_shown: set[str], behaviour: dic
         questioned = behaviour["flagged"] or bool(corrected & fitting_shown)
         return "under-reliance" if questioned else "appropriate"
     return "n/a"
+
+
+# End-of-session questionnaire (7-point agreement). Items map to Assignment 1:
+# self-reported trust, perceived understanding and control, checking effort (a
+# usability cost) and comfort with seeing past conversations (the privacy cost
+# raised in the Gap section). "effort" is negatively worded, so it is
+# reverse-scored in the analysis (8 - score) to make higher always better.
+LIKERT = {1: "Strongly disagree", 2: "Disagree", 3: "Somewhat disagree", 4: "Neutral",
+          5: "Somewhat agree", 6: "Agree", 7: "Strongly agree"}
+
+QUESTIONNAIRE = [
+    ("trust", "I trusted the assistant's personalised replies.", False),
+    ("understanding", "I understood how the assistant used my memories.", False),
+    ("predictability", "I could tell in advance when the assistant would use one of my memories.", False),
+    ("control", "I felt in control of how the assistant used my memories.", False),
+    ("effort", "Checking why a reply was personalised took a lot of effort.", True),
+    ("comfort", "I am comfortable with an assistant showing me the past conversations "
+                "my memories came from.", False),
+]
+
+
+def clean_comment(text: str, limit: int = 500) -> str:
+    """Free-text comment made safe for the one-line, semicolon-separated log detail."""
+    return " ".join((text or "").replace(";", ",").split())[:limit]

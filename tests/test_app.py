@@ -462,3 +462,72 @@ def test_outside_study_mode_nothing_is_locked(app):
     app.chat_input[0].set_value(BIRTHDAY).run()
     assert not any(b.key == "task_done" for b in app.button)
     assert not app.chat_input[0].proto.disabled
+
+
+# ------------------------------------------------- study Part 3: questionnaire ---
+def _answer_all(app, score=5):
+    from mpa.study import QUESTIONNAIRE
+    for item, _, _ in QUESTIONNAIRE:
+        app.radio(key=f"q_{item}").set_value(score)
+
+
+def _finish_one_task(app):
+    msg = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"flag_{msg['turn_id']}").click().run()
+    app.button(key="task_done").click().run()
+    app.radio(key="fit_m2").set_value("no")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+
+
+def test_finish_session_appears_only_between_tasks(app):
+    msg = _start_task(app, "Can you write a birthday message", ["m2"])
+    assert not any(b.key == "finish_session" for b in app.button)          # task still open
+    app.button(key="task_done").click().run()
+    app.radio(key="fit_m2").set_value("no")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    assert any(b.key == "finish_session" for b in app.button)
+    assert any("Tasks finished: 1" in c.value for c in app.caption)
+
+
+def test_questionnaire_is_logged_separately_and_ends_the_session(app, tmp_path):
+    _finish_one_task(app)
+    app.button(key="finish_session").click().run()
+    assert app.chat_input[0].proto.disabled
+    _answer_all(app, 6)
+    app.text_area(key="q_comment").input("Liked seeing the sources; a bit slow")
+    next(b for b in app.button if b.label == "Submit").click().run()
+    assert not app.exception
+    log = _log(tmp_path)
+    assert log.count("questionnaire_answered") == 7                          # 6 items + comment
+    assert "item=trust;score=6;reverse=False" in log and "item=effort;score=6;reverse=True" in log
+    assert "item=comment;text=Liked seeing the sources, a bit slow" in log
+    assert "session_finished" in log and "tasks=1" in log
+    assert any("end of the session" in s.value for s in app.success)
+    assert app.chat_input[0].proto.disabled                                  # nothing more to do
+
+
+def test_every_statement_must_be_answered(app, tmp_path):
+    _study(app)
+    app.button(key="finish_session").click().run()
+    app.radio(key="q_trust").set_value(4)
+    next(b for b in app.button if b.label == "Submit").click().run()
+    assert any("answer every statement" in w.value for w in app.warning)
+    log_file = tmp_path / "interaction_log.csv"
+    assert not log_file.exists() or "questionnaire_answered" not in log_file.read_text()
+
+
+def test_new_participant_gets_a_new_session_and_fresh_state(app, tmp_path):
+    _finish_one_task(app)
+    old = app.session_state["session_id"]
+    app.radio(key="condition").set_value("B").run()
+    app.button(key="new_participant").click().run()
+    assert not app.exception
+    assert app.session_state["session_id"] != old
+    assert app.session_state["messages"] == [] and app.session_state["questionnaire"] is None
+    rows = [r for r in _log(tmp_path).splitlines() if "participant_started" in r]
+    assert len(rows) == 1 and app.session_state["session_id"] in rows[0] and "condition=B" in rows[0]
+
+
+def test_no_questionnaire_outside_study_mode(app):
+    app.chat_input[0].set_value(BIRTHDAY).run()
+    assert not any(b.key == "finish_session" for b in app.button)

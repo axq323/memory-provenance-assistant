@@ -58,3 +58,19 @@ def test_reliance_outcomes():
     assert reliance(set(), {"m3", "m4"}, _b(corrected=["m4"])) == "under-reliance"
     assert reliance(set(), {"m3", "m4"}, _b(flagged=True)) == "under-reliance"
     assert reliance(set(), set(), _b()) == "n/a"
+
+
+# ------------------------------------------------------------ Part 3 ---
+from mpa.study import LIKERT, QUESTIONNAIRE, clean_comment  # noqa: E402
+
+
+def test_questionnaire_items_are_unique_and_only_effort_is_reversed():
+    ids = [i for i, _, _ in QUESTIONNAIRE]
+    assert len(ids) == len(set(ids)) == 6
+    assert [i for i, _, rev in QUESTIONNAIRE if rev] == ["effort"]
+    assert list(LIKERT) == [1, 2, 3, 4, 5, 6, 7]
+
+
+def test_comments_are_made_safe_for_the_log():
+    assert clean_comment("Good;\nbut slow  ") == "Good, but slow"
+    assert len(clean_comment("x" * 900)) == 500

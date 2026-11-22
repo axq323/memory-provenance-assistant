@@ -21,7 +21,8 @@ from mpa.display import tame_headings  # noqa: E402
 from mpa.interaction_log import log_event, read_log  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
-from mpa.study import FIT_ANSWERS, ground_truth, reliance, score_fit, score_prediction, summarise_task  # noqa: E402
+from mpa.study import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, clean_comment, ground_truth,  # noqa: E402
+                       reliance, score_fit, score_prediction, summarise_task)
 from mpa.task_types import LABELS, classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
 
@@ -63,6 +64,7 @@ ss.setdefault("awaiting_prediction", None)  # prompt waiting for the participant
 # While it is open the participant reacts freely; new prompts are locked until it is finished.
 ss.setdefault("study_task", None)
 ss.setdefault("awaiting_fit", False)
+ss.setdefault("questionnaire", None)   # None, "open" or "done" (end of the participant's session)
 # Study condition: A = memories with source context, B = memories only.
 # A researcher can fix it per participant with ?condition=B in the URL.
 ss.setdefault("condition", "B" if st.query_params.get("condition", "A").upper() == "B" else "A")
@@ -210,6 +212,7 @@ def reset_demo() -> None:
     ss.pending_redo = None
     ss.study_task = None
     ss.awaiting_fit = False
+    ss.questionnaire = None
     log("demo_reset")
     ss.flash.append("Demo reset: memories restored and chat cleared.")
 
@@ -222,8 +225,22 @@ def clear_chat() -> None:
     ss.pending_redo = None
     ss.study_task = None
     ss.awaiting_fit = False
+    ss.questionnaire = None
     log("chat_cleared")
     ss.flash.append("Chat cleared. Your memories and corrections are kept.")
+
+
+def new_participant() -> None:
+    """Researcher control: fresh memories, empty chat and a new session id, so each
+    participant's actions are logged under their own session."""
+    reset_demo()
+    ss.session_id = uuid.uuid4().hex[:6]
+    ss.flash = [f"New participant: session {ss.session_id}, condition {ss.condition}."]
+    log("participant_started", detail=f"condition={ss.condition}")
+
+
+def open_questionnaire() -> None:
+    ss.questionnaire = "open"
 
 
 def _now() -> str:
@@ -535,7 +552,8 @@ def render_memory_panel() -> None:
 # ---------------------------------------------------------------- page ---
 SHOW_SOURCES = ss.condition == "A"
 # In study mode a new prompt waits until the current task (prediction -> reply -> fit) is finished.
-LOCKED = bool(ss.awaiting_prediction) or (ss.study_mode and ss.study_task is not None)
+LOCKED = bool(ss.awaiting_prediction) or (ss.study_mode and (ss.study_task is not None
+                                                             or ss.questionnaire is not None))
 for note in ss.flash:
     st.toast(note)
 ss.flash = []
@@ -561,6 +579,9 @@ with st.sidebar:
                        "Memories and your corrections are kept.")
         st.button("Reset demo", key="reset_demo", on_click=reset_demo,
                   help="Restores the original memories and clears the chat.")
+        st.button("New participant", key="new_participant", on_click=new_participant,
+                  help="Study sessions: resets the demo and starts a new session id in the log, "
+                       "keeping the selected condition.")
         log_file = RUNTIME / "interaction_log.csv"
         if log_file.exists():
             st.download_button("Download interaction log", log_file.read_bytes(),
@@ -668,6 +689,48 @@ def render_task_controls() -> None:
     st.rerun()
 
 
+def tasks_finished() -> int:
+    return sum(1 for m in ss.messages if m.get("task_summary"))
+
+
+def render_session_end() -> None:
+    """Study mode: 'Finish the session' when no task is open, then the questionnaire."""
+    if ss.questionnaire == "done":
+        with st.chat_message("assistant", avatar="🔮"):
+            st.success("Thank you, that's the end of the session.")
+        return
+    if ss.questionnaire is None:
+        with st.chat_message("assistant", avatar="🔮"):
+            st.caption(f"Tasks finished: {tasks_finished()}. Ask the next question, or finish when "
+                       "you've done all the tasks.")
+            st.button("Finish the session →", key="finish_session", on_click=open_questionnaire)
+        return
+    with st.chat_message("assistant", avatar="🔮"):
+        with st.form("questionnaire_form"):
+            st.markdown("**Last step: how did you find the assistant?** "
+                        "How much do you agree with each statement? (1 = strongly disagree, 7 = strongly agree)")
+            for item, statement, _ in QUESTIONNAIRE:
+                st.radio(statement, list(LIKERT),
+                         format_func=lambda v: f"{v} {LIKERT[v]}" if v in (1, 7) else str(v),
+                         index=None, horizontal=True, key=f"q_{item}")
+            st.text_area("Anything else you'd like to tell us? (optional)", key="q_comment")
+            submitted = st.form_submit_button("Submit")
+    if not submitted:
+        return
+    answers = {item: ss.get(f"q_{item}") for item, _, _ in QUESTIONNAIRE}
+    if any(v is None for v in answers.values()):
+        st.warning("Please answer every statement.")
+        return
+    for item, _, reverse in QUESTIONNAIRE:
+        log("questionnaire_answered", detail=f"item={item};score={answers[item]};reverse={reverse}")
+    comment = clean_comment(ss.get("q_comment", ""))
+    if comment:
+        log("questionnaire_answered", detail=f"item=comment;text={comment}")
+    log("session_finished", detail=f"tasks={tasks_finished()}")
+    ss.questionnaire = "done"
+    st.rerun()
+
+
 if ss.pending_redo is not None:
     run_pending_redo()
     st.rerun()
@@ -676,6 +739,8 @@ if ss.awaiting_prediction:
     render_prediction_step()
 elif ss.study_mode and ss.study_task is not None:
     render_task_controls()
+elif ss.study_mode:
+    render_session_end()
 
 typed = st.chat_input("Ask your assistant anything…", disabled=LOCKED)
 prompt = typed or ss.pending_prompt
