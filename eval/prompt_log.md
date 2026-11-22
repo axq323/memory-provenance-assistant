@@ -11,3 +11,6 @@ Criteria (written before tuning) are in `eval/cases.json`. Replay mode runs only
 | 20261119-223747 | v1 | live: live (llama3.2:3b at http://localhost:11434/v1) | 5/10 | Second live run, llama3.2:3b, prompt v1 | `eval\results\20261119-223747_live.csv` |
 | 20261119-232300 | v2 | live: live (llama3.2:3b at http://localhost:11434/v1) | 5/10 | v2: memory list first, MUST-list rule, example, no <br> | `eval\results\20261119-232300_live.csv` |
 | 20261121-034722 | v2 | live: live (qwen2.5:7b at http://localhost:11434/v1) | 8/10 | v2 prompt, qwen2.5:7b | `eval\results\20261121-034722_live.csv` |
+| 20261122-035646 | v2 | live: live (qwen2.5:7b at http://localhost:11434/v1) | 7/10 | qwen reporting rate, run  | `eval\results\20261122-035646_live.csv` |
+| 20261122-040000 | v2 | live: live (qwen2.5:7b at http://localhost:11434/v1) | 8/10 | qwen reporting rate, run  | `eval\results\20261122-040000_live.csv` |
+| 20261122-040346 | v2 | live: live (qwen2.5:7b at http://localhost:11434/v1) | 6/10 | qwen reporting rate, run  | `eval\results\20261122-040346_live.csv` |

@@ -1,0 +1,11 @@
+id,task,used,dropped,C1,C2,C3,C4,pass,error
+E01,cooking,m4,,True,True,False,True,False,
+E02,explain,,,True,True,True,True,True,
+E03,personal_message,,,True,True,True,True,True,
+E04,work_writing,,,True,True,False,True,False,
+E05,feedback,m1,,True,True,True,True,True,
+E06,cooking,"m3,m4",,True,True,True,True,True,
+E07,cooking,"m3,m4",,True,True,True,False,False,
+E08,explain,,,True,True,True,True,True,
+E09,personal_message,m2,,True,True,True,False,False,
+E10,summarise,,,True,True,True,True,True,
