@@ -74,7 +74,7 @@ class ReplayModel:
 class LiveModel:
     def __init__(self, base_url: str, model: str, api_key: str, temperature: float = 0.3):
         from openai import OpenAI  # imported lazily so replay mode needs no network setup
-        self.client = OpenAI(base_url=base_url, api_key=api_key or "none", timeout=60)
+        self.client = OpenAI(base_url=base_url, api_key=api_key or "none", timeout=120)
         self.model = model
         self.temperature = temperature
         self.name = f"live ({model} at {base_url})"
@@ -106,3 +106,19 @@ def get_model():
             model=os.getenv("LLM_MODEL", "qwen2.5:7b"),
             api_key=os.getenv("LLM_API_KEY", ""))
     return ReplayModel()
+
+
+def get_judge():
+    """The model that judges the counterfactual check (live mode only).
+
+    JUDGE_MODEL can differ from LLM_MODEL, so the assistant isn't grading
+    itself (e.g. llama3.2:3b as assistant, qwen2.5:7b as judge). Replay mode
+    needs no judge, so this returns None there.
+    """
+    if os.getenv("MODE", "replay").strip().lower() != "live":
+        return None
+    return LiveModel(
+        base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
+        model=os.getenv("JUDGE_MODEL", "qwen2.5:7b"),
+        api_key=os.getenv("LLM_API_KEY", ""),
+        temperature=0.0)

@@ -15,9 +15,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from mpa.context import assemble  # noqa: E402
-from mpa.counterfactual import check_influence, summarise  # noqa: E402
+from mpa.counterfactual import calls_needed, check_influence, summarise  # noqa: E402
 from mpa.interaction_log import log_event  # noqa: E402
-from mpa.llm import ModelError, ReplayModel, get_model  # noqa: E402
+from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
 from mpa.task_types import classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
@@ -34,7 +34,13 @@ def load_model():
     return get_model()
 
 
+@st.cache_resource
+def load_judge():
+    return get_judge()
+
+
 model = load_model()
+judge = load_judge()
 MODE = "replay" if isinstance(model, ReplayModel) else "live"
 store = MemoryStore(path=RUNTIME / "memories.json")
 
@@ -260,7 +266,7 @@ def run_influence_check(msg_index: int) -> dict:
     rec = msg["record"]
     reported = {u["id"] for u in msg["reply"].used}
     results = check_influence(model, msg["user_text"], memories_as_sent(msg), rec.task, rec.trigger,
-                              reported, history_of(msg))
+                              reported, history_of(msg), shown_answer=msg["reply"].answer, judge=judge)
     msg["influence"] = results
     counts = summarise(results)
     log("influence_checked", turn_id=msg["turn_id"], task=rec.task,
@@ -271,8 +277,9 @@ def run_influence_check(msg_index: int) -> dict:
 def render_influence(msg_index: int, msg: dict) -> None:
     results = msg.get("influence")
     if results is None:
-        calls = 1 + 2 * len(msg["record"].memories_sent) if MODE == "live" else 0
-        help_text = ("Removes each memory in turn, regenerates the reply and compares. "
+        calls = calls_needed(len(msg["record"].memories_sent), MODE == "live")
+        help_text = ("Removes each memory in turn and regenerates the reply. A judge model then checks, "
+                     "for each reply separately, whether it follows the memory. "
                      + (f"Makes about {calls} model calls, so it can take a few minutes."
                         if MODE == "live" else "Uses the scripted replies in replay mode."))
         if st.button("🔍 Check which memories mattered", key=f"infl_{msg['turn_id']}", help=help_text):
@@ -286,6 +293,8 @@ def render_influence(msg_index: int, msg: dict) -> None:
         return
     with st.container(border=True):
         st.markdown("**Which memories mattered (measured, not self-reported)**")
+        if judge is not None:
+            st.caption(f"Judged by {judge.model}, one reply at a time.")
         if not results:
             st.caption("No memories were sent with this request, so there was nothing to test.")
             return

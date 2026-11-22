@@ -105,3 +105,20 @@ def test_live_model_wraps_errors(store):
     rec = assemble("hi", store.all(), "other", None)
     with pytest.raises(ModelError):
         _live_with(_FakeCompletions(exc=ConnectionError("refused"))).generate(rec, "hi")
+
+
+def test_judge_is_none_in_replay_mode(monkeypatch):
+    from mpa.llm import get_judge
+    monkeypatch.setenv("MODE", "replay")
+    assert get_judge() is None
+
+
+def test_judge_model_comes_from_its_own_setting(monkeypatch):
+    from mpa.llm import get_judge
+    monkeypatch.setenv("MODE", "live")
+    monkeypatch.setenv("LLM_MODEL", "llama3.2:3b")
+    monkeypatch.setenv("JUDGE_MODEL", "qwen2.5:7b")
+    judge = get_judge()
+    assert judge.model == "qwen2.5:7b" and judge.temperature == 0.0
+    monkeypatch.delenv("JUDGE_MODEL")
+    assert get_judge().model == "qwen2.5:7b"          # default judge

@@ -1,20 +1,33 @@
 """Counterfactual memory check: measure which memories actually changed a reply.
 
 Why: model self-report is not reliable. In testing, llama3.2:3b followed
-the vegetarian memory in 12/12 runs but reported it in 0/12, so an
-interface that trusts the model's memories_used list can tell users no
-memory was used when one was. This check measures influence from
-behaviour instead: remove each sent memory in turn, regenerate the
-reply, and compare.
+the vegetarian memory in 12/12 runs but reported it in 0/12, and
+qwen2.5:7b misapplied memories without reporting them, so an interface
+that trusts the model's memories_used list can tell users no memory was
+used when one was. This check measures influence from behaviour instead.
 
-Live mode: every reply (baseline included) is regenerated at
-temperature 0, so sampling noise is not mistaken for influence, and a
-judge call decides whether the difference reflects the removed memory.
+How (live mode), for each memory that was sent with the reply:
+  1. Regenerate the reply WITHOUT that memory (same history, temperature 0).
+  2. Ask a judge one narrow question about each reply separately:
+     "Does this reply follow the fact?" The judge sees one reply at a time
+     and is not told whether it was written with or without the memory.
+  3. The memory changed the reply only if the reply the user saw follows
+     the fact and the reply without it does not.
+
+Why not ask the judge to compare two replies? That was the first design.
+With an open comparison, small judges attributed any difference between
+the replies (wording, length) to whichever memory had been removed, e.g.
+"formal tone changed a lunch recipe" or "vegetarian changed an
+anniversary message". A per-reply yes/no question about one fact cannot
+be satisfied by unrelated differences.
+
+The judge can be a different model from the assistant (JUDGE_MODEL), so
+the assistant is not grading itself.
+
 Replay mode: scripted replies are deterministic, so a reply that changes
-when a memory is removed was influenced by it.
+when a memory is removed was influenced by it. No judge is needed.
 
-Cost: 1 + 2 x (memories sent) model calls in live mode, so the check
-runs only on demand.
+Cost (live): per memory, 1 regeneration + 2 judge calls.
 """
 
 from __future__ import annotations
@@ -29,30 +42,28 @@ from .validate import validate
 
 MAX_REPLY_CHARS = 1500  # keep judge prompts short
 
-JUDGE_PROMPT = """You compare two replies to the same request.
-Reply A was written knowing a fact about the user. Reply B was written without it.
+JUDGE_PROMPT = """You check whether a reply follows one fact about the user.
 
-FACT: {memory}
-REQUEST: {request}
+FACT ABOUT THE USER: {memory}
+THE USER'S REQUEST: {request}
 
-REPLY A (with the fact):
-{a}
+REPLY:
+{reply}
 
-REPLY B (without the fact):
-{b}
-
-Does reply A reflect the fact in a way that reply B does not? Ignore differences
-in wording that have nothing to do with the fact.
-Reply ONLY with JSON: {{"influenced": true or false, "evidence": "<one short sentence>"}}"""
+Does this reply follow the fact? Answer true only if something specific in the
+reply reflects the fact. If the fact has nothing to do with this reply, answer false.
+Reply ONLY with JSON: {{"follows": true or false, "reason": "<one short sentence>"}}"""
 
 
 @dataclass
 class Influence:
     id: str
     text: str
-    reported: bool             # the model listed it in memories_used
-    influenced: bool | None    # measured; None = could not decide
+    reported: bool                  # the model listed it in memories_used
+    influenced: bool | None         # measured; None = could not decide
     evidence: str
+    follows_with: bool | None = None     # judge: the reply the user saw follows the fact
+    follows_without: bool | None = None  # judge: the reply without the memory follows it
 
     @property
     def verdict(self) -> str:
@@ -70,28 +81,47 @@ class Influence:
 
 def check_influence(model, user_text: str, memories: list[dict], task: str,
                     trigger: str | None, reported_ids: set[str],
-                    history: list[dict] | None = None) -> list[Influence]:
-    """Test every memory that context assembly would send for this request."""
+                    history: list[dict] | None = None, *,
+                    shown_answer: str | None = None, judge=None) -> list[Influence]:
+    """Test every memory that context assembly sends for this request.
+
+    shown_answer: the reply the user actually saw. If given, it is the reply
+        that is judged, so "the assistant listed it" and "it changed the reply"
+        describe the same reply. If not given, the reply is regenerated.
+    judge: the model that answers the yes/no questions (default: the assistant model).
+    """
     live = not isinstance(model, ReplayModel)
+    judge = judge or model
     full = assemble(user_text, memories, task, trigger, history)
-    baseline = _answer(model, full, user_text, live)   # ModelError here propagates
+    baseline = shown_answer if shown_answer is not None else _answer(model, full, user_text, live)
 
     results = []
     for sent in full.memories_sent:
-        mid = sent["id"]
+        mid, fact = sent["id"], sent["text"]
+        reported = mid in reported_ids
         try:
             without = [m for m in memories if m["id"] != mid]
             record = assemble(user_text, without, task, trigger, history)
             alt = _answer(model, record, user_text, live)
-            if live:
-                influenced, evidence = _judge(model, sent["text"], user_text, baseline, alt)
-            else:
-                influenced = _normalise(alt) != _normalise(baseline)
-                evidence = ("The reply changed when this memory was removed." if influenced
-                            else "The reply was the same without this memory.")
         except ModelError as exc:
-            influenced, evidence = None, f"Model call failed: {exc}"
-        results.append(Influence(mid, sent["text"], mid in reported_ids, influenced, evidence))
+            results.append(Influence(mid, fact, reported, None, f"Model call failed: {exc}"))
+            continue
+
+        if not live:
+            influenced = _normalise(alt) != _normalise(baseline)
+            evidence = ("The reply changed when this memory was removed." if influenced
+                        else "The reply was the same without this memory.")
+            results.append(Influence(mid, fact, reported, influenced, evidence))
+            continue
+
+        try:
+            f_with, why_with = _follows(judge, fact, user_text, baseline)
+            f_without, why_without = _follows(judge, fact, user_text, alt)
+        except ModelError as exc:
+            results.append(Influence(mid, fact, reported, None, f"Judge call failed: {exc}"))
+            continue
+        influenced, evidence = _decide(f_with, why_with, f_without, why_without)
+        results.append(Influence(mid, fact, reported, influenced, evidence, f_with, f_without))
     return results
 
 
@@ -103,20 +133,46 @@ def summarise(results: list[Influence]) -> dict:
     return counts
 
 
+def calls_needed(n_memories: int, live: bool) -> int:
+    """Model calls for one check (shown in the UI before the user starts it)."""
+    return 3 * n_memories if live else 0
+
+
 # ---------------------------------------------------------------- helpers ---
 def _answer(model, record, user_text: str, live: bool) -> str:
     raw = model.generate(record, user_text, temperature=0.0) if live else model.generate(record, user_text)
     return validate(raw, record.sent_ids).answer
 
 
-def _judge(model, memory: str, request: str, a: str, b: str) -> tuple[bool | None, str]:
-    prompt = JUDGE_PROMPT.format(memory=memory, request=request,
-                                 a=a[:MAX_REPLY_CHARS], b=b[:MAX_REPLY_CHARS])
-    raw = model.complete([{"role": "user", "content": prompt}], temperature=0.0, json_mode=True)
+def _follows(judge, memory: str, request: str, reply: str) -> tuple[bool | None, str]:
+    """One narrow question about one reply. None if the judge's answer can't be read."""
+    prompt = JUDGE_PROMPT.format(memory=memory, request=request, reply=reply[:MAX_REPLY_CHARS])
+    raw = judge.complete([{"role": "user", "content": prompt}], temperature=0.0, json_mode=True)
     data = _parse_json(raw)
-    if not isinstance(data, dict) or not isinstance(data.get("influenced"), bool):
-        return None, "The judge's reply couldn't be read."
-    return data["influenced"], str(data.get("evidence", "")).strip() or "No evidence given."
+    if not isinstance(data, dict) or not isinstance(data.get("follows"), bool):
+        return None, "the judge's answer couldn't be read"
+    return data["follows"], str(data.get("reason", "")).strip().rstrip(".") or "no reason given"
+
+
+def _decide(f_with: bool | None, why_with: str,
+            f_without: bool | None, why_without: str) -> tuple[bool | None, str]:
+    """Turn the two yes/no answers into a verdict.
+
+    with  | without | result
+    yes   | no      | changed the reply
+    yes   | yes     | no difference (the reply would have followed it anyway)
+    no    | no      | no difference
+    no    | yes     | unclear (inconsistent: removing the fact made the reply follow it)
+    unreadable      | unclear
+    """
+    evidence = f"With it: {why_with}. Without it: {why_without}."
+    if f_with is None or f_without is None:
+        return None, evidence
+    if f_with and not f_without:
+        return True, evidence
+    if f_with == f_without:
+        return False, evidence
+    return None, "Inconsistent: the reply without this memory followed it more. " + evidence
 
 
 def _parse_json(raw: str):
