@@ -7,15 +7,163 @@
   ],
   "_note": "A case passes only if all four criteria hold. Cases marked replay=true are the three scripted demo prompts; replay mode runs only those. Criteria were written before the system prompt was tuned (Lecture 09: write the criteria first, then score).",
   "cases": [
-    {"id": "E01", "replay": true, "prompt": "Can you suggest something I could make for dinner tonight?", "should_use": ["m3", "m4"], "should_not_use": ["m1", "m2"]},
-    {"id": "E02", "replay": true, "prompt": "I don't really understand how solar panels work. Can you explain it properly, step by step?", "should_use": [], "should_not_use": ["m1", "m2"], "_why": "Over-application case (Figure 1): a concise-summary preference from essay revision should not compress a requested step-by-step explanation."},
-    {"id": "E03", "replay": true, "prompt": "Can you write a birthday message for my best friend Sam? Something warm and a bit funny.", "should_use": [], "should_not_use": ["m2", "m1"], "_why": "Over-application case: a formal tone requested for an email to a manager should not be applied to a message to a friend."},
-    {"id": "E04", "prompt": "Write an email to my manager asking for Friday afternoon off.", "should_use": ["m2"], "should_not_use": ["m3", "m4"]},
-    {"id": "E05", "prompt": "Can you give me feedback on my essay intro? 'Computers changed the world. This essay is about the history of computers.'", "should_use": ["m1"], "should_not_use": ["m3", "m4"]},
-    {"id": "E06", "prompt": "What's a good recipe for a packed lunch?", "should_use": ["m3"], "should_not_use": ["m2"]},
-    {"id": "E07", "prompt": "Plan a dinner party menu for Saturday. I want to impress my guests and I have all afternoon to cook.", "should_use": ["m3"], "should_not_use": ["m4"], "_why": "Conflict case: the request overrides the stored weeknight time limit."},
-    {"id": "E08", "prompt": "Explain how a mortgage works in detail.", "should_use": [], "should_not_use": ["m1", "m3", "m4"]},
-    {"id": "E09", "prompt": "Write a thank-you text to my grandmother for the birthday gift she sent.", "should_use": [], "should_not_use": ["m2"]},
-    {"id": "E10", "prompt": "Summarise the plot of Hamlet in a few lines.", "should_use": [], "should_not_use": ["m2", "m3", "m4"]}
-  ]
+    {
+      "id": "E01",
+      "replay": true,
+      "prompt": "Can you suggest something I could make for dinner tonight?",
+      "should_use": [
+        "m3",
+        "m4"
+      ],
+      "should_not_use": [
+        "m1",
+        "m2"
+      ]
+    },
+    {
+      "id": "E02",
+      "replay": true,
+      "prompt": "I don't really understand how solar panels work. Can you explain it properly, step by step?",
+      "should_use": [],
+      "should_not_use": [
+        "m1",
+        "m2"
+      ],
+      "_why": "Over-application case (Figure 1): a concise-summary preference from essay revision should not compress a requested step-by-step explanation."
+    },
+    {
+      "id": "E03",
+      "replay": true,
+      "prompt": "Can you write a birthday message for my best friend Sam? Something warm and a bit funny.",
+      "should_use": [],
+      "should_not_use": [
+        "m2",
+        "m1"
+      ],
+      "_why": "Over-application case: a formal tone requested for an email to a manager should not be applied to a message to a friend."
+    },
+    {
+      "id": "E04",
+      "prompt": "Write an email to my manager asking for Friday afternoon off.",
+      "should_use": [
+        "m2"
+      ],
+      "should_not_use": [
+        "m3",
+        "m4"
+      ]
+    },
+    {
+      "id": "E05",
+      "prompt": "Can you give me feedback on my essay intro? 'Computers changed the world. This essay is about the history of computers.'",
+      "should_use": [
+        "m1"
+      ],
+      "should_not_use": [
+        "m3",
+        "m4"
+      ]
+    },
+    {
+      "id": "E06",
+      "prompt": "What's a good recipe for a packed lunch?",
+      "should_use": [
+        "m3"
+      ],
+      "should_not_use": [
+        "m2"
+      ]
+    },
+    {
+      "id": "E07",
+      "prompt": "Plan a dinner party menu for Saturday. I want to impress my guests and I have all afternoon to cook.",
+      "should_use": [
+        "m3"
+      ],
+      "should_not_use": [
+        "m4"
+      ],
+      "_why": "Conflict case: the request overrides the stored weeknight time limit."
+    },
+    {
+      "id": "E08",
+      "prompt": "Explain how a mortgage works in detail.",
+      "should_use": [],
+      "should_not_use": [
+        "m1",
+        "m3",
+        "m4"
+      ]
+    },
+    {
+      "id": "E09",
+      "prompt": "Write a thank-you text to my grandmother for the birthday gift she sent.",
+      "should_use": [],
+      "should_not_use": [
+        "m2"
+      ]
+    },
+    {
+      "id": "E10",
+      "prompt": "Summarise the plot of Hamlet in a few lines.",
+      "should_use": [],
+      "should_not_use": [
+        "m2",
+        "m3",
+        "m4"
+      ]
+    },
+    {
+      "id": "E11",
+      "held_out": true,
+      "prompt": "Write a message for my friend Priya, whose grandfather just passed away.",
+      "should_use": [],
+      "should_not_use": [
+        "m1",
+        "m2",
+        "m3",
+        "m4"
+      ],
+      "_why": "Personal message of a kind not in E01-E10: neither the essay bullet-point preference nor the work formal tone should shape it."
+    },
+    {
+      "id": "E12",
+      "held_out": true,
+      "prompt": "Write a quick text to my flatmate asking them to pick up milk on the way home.",
+      "should_use": [],
+      "should_not_use": [
+        "m1",
+        "m2"
+      ],
+      "_why": "Casual text not caught by the task-type keywords ('other'), so only the model's own judgement can avoid the formal tone."
+    },
+    {
+      "id": "E13",
+      "held_out": true,
+      "prompt": "Write the opening paragraph of a cover letter for a data analyst job.",
+      "should_use": [
+        "m2"
+      ],
+      "should_not_use": [
+        "m3",
+        "m4"
+      ],
+      "_why": "Over-caution check: professional writing where the formal tone SHOULD still apply."
+    },
+    {
+      "id": "E14",
+      "held_out": true,
+      "prompt": "It's Tuesday and I've just got home from work. What can I make for dinner?",
+      "should_use": [
+        "m3",
+        "m4"
+      ],
+      "should_not_use": [
+        "m1",
+        "m2"
+      ],
+      "_why": "Over-caution check: a weeknight dinner where the quick-meals and vegetarian memories SHOULD apply."
+    }
+  ],
+  "_note_held_out": "E11-E14 were added on 22 Nov 2026 BEFORE prompt v3 was written, as held-out cases the v3 rules were not designed around. If v3 helps only on E01-E10, it was tuned to the test."
 }

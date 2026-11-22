@@ -42,7 +42,18 @@ from .validate import validate
 
 MAX_REPLY_CHARS = 1500  # keep judge prompts short
 
-JUDGE_PROMPT = """You check whether a reply follows one fact about the user.
+# j1 asked only "does something specific in the reply reflect the fact?". In live
+# testing the judge read that as "does the reply MENTION it": a reply written as
+# bullet points was judged not to follow a bullet-point preference because it
+# "does not specify a bullet-point format". j2 separates preferences about how a
+# reply is written (judge the form) from facts about the user (judge the content).
+# The example deliberately uses a preference that is not one of the test memories.
+# j3: in live testing with j2, the judge's yes/no answer contradicted its own reason
+# ("the reply uses bullet points, aligning with the preference" with follows=false).
+# The answer was written before the reason, so the reason couldn't inform it. j3 asks
+# for the reason first, then the yes/no, and the evidence now shows both.
+JUDGE_PROMPT_VERSION = "j3"
+JUDGE_PROMPT = """You check whether a reply follows one fact or preference about the user.
 
 FACT ABOUT THE USER: {memory}
 THE USER'S REQUEST: {request}
@@ -50,9 +61,18 @@ THE USER'S REQUEST: {request}
 REPLY:
 {reply}
 
-Does this reply follow the fact? Answer true only if something specific in the
-reply reflects the fact. If the fact has nothing to do with this reply, answer false.
-Reply ONLY with JSON: {{"follows": true or false, "reason": "<one short sentence>"}}"""
+Does this reply follow the fact?
+- If the fact is a preference about how replies are written (format, layout, tone,
+  length, style), judge how THIS reply is written. For example, a reply written in
+  British spelling follows a preference for British spelling, even though it never
+  mentions spelling.
+- If the fact is about the user's life or needs (diet, schedule, location and so on),
+  judge whether the content of the reply reflects it.
+First describe, in one short sentence, how the reply relates to the fact. Then decide:
+"follows" is true only if the reply clearly follows the fact, and false if it does not
+or if the fact has nothing to do with this reply. Make sure "follows" agrees with your reason.
+Reply ONLY with JSON, with "reason" first:
+{{"reason": "<one short sentence>", "follows": true or false}}"""
 
 
 @dataclass
@@ -64,11 +84,16 @@ class Influence:
     evidence: str
     follows_with: bool | None = None     # judge: the reply the user saw follows the fact
     follows_without: bool | None = None  # judge: the reply without the memory follows it
+    reply_without: str = ""                # the regenerated reply, so the user can inspect it
 
     @property
     def verdict(self) -> str:
         if self.influenced is None:
             return "unclear"
+        if self.influenced is False and self.follows_with and self.follows_without:
+            # the reply follows the memory, but would do so without it too:
+            # it fits, it just wasn't needed (not a misreport either way)
+            return "fits, no difference"
         if self.influenced and not self.reported:
             return "unreported influence"
         if self.reported and not self.influenced:
@@ -111,22 +136,23 @@ def check_influence(model, user_text: str, memories: list[dict], task: str,
             influenced = _normalise(alt) != _normalise(baseline)
             evidence = ("The reply changed when this memory was removed." if influenced
                         else "The reply was the same without this memory.")
-            results.append(Influence(mid, fact, reported, influenced, evidence))
+            results.append(Influence(mid, fact, reported, influenced, evidence, reply_without=alt))
             continue
 
         try:
             f_with, why_with = _follows(judge, fact, user_text, baseline)
             f_without, why_without = _follows(judge, fact, user_text, alt)
         except ModelError as exc:
-            results.append(Influence(mid, fact, reported, None, f"Judge call failed: {exc}"))
+            results.append(Influence(mid, fact, reported, None, f"Judge call failed: {exc}",
+                                     reply_without=alt))
             continue
         influenced, evidence = _decide(f_with, why_with, f_without, why_without)
-        results.append(Influence(mid, fact, reported, influenced, evidence, f_with, f_without))
+        results.append(Influence(mid, fact, reported, influenced, evidence, f_with, f_without, alt))
     return results
 
 
 def summarise(results: list[Influence]) -> dict:
-    counts = {"agrees": 0, "unreported influence": 0,
+    counts = {"agrees": 0, "fits, no difference": 0, "unreported influence": 0,
               "claimed, no measurable influence": 0, "unclear": 0}
     for r in results:
         counts[r.verdict] += 1
@@ -160,12 +186,14 @@ def _decide(f_with: bool | None, why_with: str,
 
     with  | without | result
     yes   | no      | changed the reply
-    yes   | yes     | no difference (the reply would have followed it anyway)
+    yes   | yes     | no difference: it fits, but the reply would follow it anyway
     no    | no      | no difference
     no    | yes     | unclear (inconsistent: removing the fact made the reply follow it)
     unreadable      | unclear
     """
-    evidence = f"With it: {why_with}. Without it: {why_without}."
+    yn = {True: "yes", False: "no", None: "?"}
+    evidence = (f"With it ({yn[f_with]}): {why_with}. "
+                f"Without it ({yn[f_without]}): {why_without}.")
     if f_with is None or f_without is None:
         return None, evidence
     if f_with and not f_without:

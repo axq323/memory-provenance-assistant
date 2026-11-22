@@ -270,3 +270,87 @@ def test_clear_chat_cancels_a_pending_prediction(app):
     assert not app.exception
     assert app.session_state["awaiting_prediction"] is None
     assert app.session_state["messages"] == []
+
+
+# ------------------------------------------------- stage 3: memory statuses ---
+def test_sent_but_unclaimed_memories_are_listed_with_controls(app):
+    app.chat_input[0].set_value(EXPLAIN).run()          # replay: assistant claims m1 only
+    turn = _assistant(app)[0]["turn_id"]
+    assert any("Also sent with this request, not listed by the assistant (3)" in e.label
+               for e in app.expander)
+    keys = {b.key for b in app.button}
+    assert {f"nft_{turn}:m2", f"nft_{turn}:m3", f"nft_{turn}:m4"} <= keys
+    assert any("(as reported by the assistant)" in m.value for m in app.markdown)
+
+
+def test_unclaimed_memory_can_be_corrected_and_is_then_withheld(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    turn = _assistant(app)[0]["turn_id"]
+    app.button(key=f"nft_{turn}:m2").click().run()
+    assert not app.exception
+    redo = _assistant(app)[-1]
+    assert redo["regenerated_from"] == turn
+    assert "m2" not in redo["record"].sent_ids
+    assert any(c.value.startswith("⛔ Not sent: You want a formal")
+               and "you chose not to use it for explanations" in c.value for c in app.caption)
+
+
+def test_check_results_appear_on_the_memory_chips(app):
+    app.chat_input[0].set_value(DINNER).run()
+    turn = _assistant(app)[0]["turn_id"]
+    app.button(key=f"infl_{turn}").click().run()
+    captions = [c.value for c in app.caption]
+    assert captions.count("Measured by the check: ✅ Used, as the assistant said") == 2      # m3, m4
+    assert captions.count("Measured by the check: ✅ Not used, as the assistant said") == 2  # m1, m2
+
+
+def test_unreported_influence_opens_the_unclaimed_list_with_a_warning(app):
+    from mpa.counterfactual import Influence
+    app.chat_input[0].set_value(DINNER).run()
+    msg = _assistant(app)[0]
+    msg["influence"] = [Influence("m2", "formal", False, True, "x")]
+    app.run()
+    exp = next(e for e in app.expander if "Also sent with this request" in e.label)
+    assert exp.label.startswith("⚠️") and exp.proto.expanded
+    assert any("Changed the reply, but the assistant didn't list it" in c.value for c in app.caption)
+
+
+def test_memory_panel_can_restrict_a_memory_without_a_reply(app, tmp_path):
+    app.selectbox(key="nft_pick_m1").set_value("summarise").run()
+    app.button(key="nft_apply_m1").click().run()
+    assert not app.exception
+    assert any(c.value == "⛔ Not used for summaries" for c in app.caption)
+    options = app.selectbox(key="nft_pick_m1").options
+    assert "summaries" not in options and "explanations" in options
+    assert "from memory panel" in (tmp_path / "interaction_log.csv").read_text()
+
+
+def test_check_lets_the_user_see_the_reply_without_a_memory(app):
+    app.chat_input[0].set_value(DINNER).run()
+    turn = _assistant(app)[0]["turn_id"]
+    app.button(key=f"infl_{turn}").click().run()
+    assert not app.exception
+    results = _assistant(app)[0]["influence"]
+    assert all(r.reply_without for r in results)
+    without_m3 = next(r for r in results if r.id == "m3").reply_without
+    assert any(m.value == without_m3 for m in app.markdown)   # shown inside the popover
+
+
+def test_forget_also_removes_the_reply_without_it(app):
+    app.chat_input[0].set_value(DINNER).run()
+    turn = _assistant(app)[0]["turn_id"]
+    app.button(key=f"infl_{turn}").click().run()
+    next(b for b in app.button if (b.key or "") == f"forget_{turn}:m3").click().run()
+    r = next(r for r in _assistant(app)[0]["influence"] if r.id == "m3")
+    assert r.reply_without == "[forgotten]"
+
+
+def test_check_can_be_run_again_on_the_same_reply(app, tmp_path):
+    app.chat_input[0].set_value(DINNER).run()
+    turn = _assistant(app)[0]["turn_id"]
+    app.button(key=f"infl_{turn}").click().run()
+    app.button(key=f"infl_again_{turn}").click().run()
+    assert "influence" not in _assistant(app)[0]
+    app.button(key=f"infl_{turn}").click().run()
+    assert not app.exception
+    assert (tmp_path / "interaction_log.csv").read_text().count("influence_checked") == 2

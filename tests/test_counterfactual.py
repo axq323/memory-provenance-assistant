@@ -41,7 +41,8 @@ def test_excluded_memory_is_not_tested(store):
 def test_summary_counts_verdicts():
     rs = [Influence("m1", "", True, True, ""), Influence("m2", "", False, True, ""),
           Influence("m3", "", True, False, ""), Influence("m4", "", False, None, "")]
-    assert summarise(rs) == {"agrees": 1, "unreported influence": 1,
+    rs.append(Influence("m5", "", False, False, "", follows_with=True, follows_without=True))
+    assert summarise(rs) == {"agrees": 1, "fits, no difference": 1, "unreported influence": 1,
                              "claimed, no measurable influence": 1, "unclear": 1}
 
 
@@ -123,7 +124,9 @@ def test_memory_the_reply_follows_anyway_made_no_difference(store):
     fake = FakeLive(follows=lambda fact, reply: "vegetarian" in fact)   # both replies 'follow'
     res = _check(fake, store, DINNER, reported={"m3"})
     assert res["m3"].influenced is False
-    assert res["m3"].verdict == "claimed, no measurable influence"
+    assert res["m3"].verdict == "fits, no difference"        # not a misreport
+    unclaimed = _check(FakeLive(follows=lambda fact, reply: "vegetarian" in fact), store, DINNER, set())
+    assert unclaimed["m3"].verdict == "fits, no difference"
 
 
 def test_inconsistent_answers_are_unclear(store):
@@ -153,7 +156,7 @@ def test_separate_judge_model_answers_the_questions(store):
 
 def test_evidence_quotes_both_answers(store):
     res = _check(FakeLive(), store, DINNER, reported=set())
-    assert res["m3"].evidence == "With it: meat-free. Without it: not related."
+    assert res["m3"].evidence == "With it (yes): meat-free. Without it (no): not related."
 
 
 def test_calls_needed():
@@ -181,3 +184,29 @@ def test_live_model_complete_passes_temperature_and_json_mode():
     model.client.chat.completions = fake
     model.complete([{"role": "user", "content": "hi"}], temperature=0.0, json_mode=False)
     assert fake.kwargs["temperature"] == 0.0 and "response_format" not in fake.kwargs
+
+
+def test_reported_memory_with_no_effect_and_not_followed_is_still_flagged(store):
+    # listed by the assistant, but neither reply follows it: a real over-claim
+    res = _check(FakeLive(), store, DINNER, reported={"m2"})
+    assert res["m2"].verdict == "claimed, no measurable influence"
+
+
+def test_judge_prompt_asks_about_form_for_style_preferences(store):
+    fake = FakeLive()
+    _check(fake, store, DINNER, reported=set())
+    p = fake.judge_prompts[0]
+    assert "judge how THIS reply is written" in p and "judge whether the content" in p
+    assert "bullet" not in p.lower().replace(store.get("m1")["text"].lower(), "")  # no test-memory example
+
+
+def test_the_reply_without_each_memory_is_kept(store):
+    res = _check(FakeLive(), store, DINNER, reported=set())
+    assert res["m3"].reply_without == "Try a chicken stir-fry."
+
+
+def test_judge_writes_its_reason_before_the_yes_no_answer(store):
+    fake = FakeLive()
+    _check(fake, store, DINNER, reported=set())
+    p = fake.judge_prompts[0]
+    assert p.index('"reason"') < p.index('"follows": true or false')

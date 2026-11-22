@@ -15,12 +15,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from mpa.context import assemble  # noqa: E402
-from mpa.counterfactual import calls_needed, check_influence, summarise  # noqa: E402
+from mpa.counterfactual import JUDGE_PROMPT_VERSION, calls_needed, check_influence, summarise  # noqa: E402
+from mpa.display import tame_headings  # noqa: E402
 from mpa.interaction_log import log_event  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
 from mpa.study import ground_truth, score_prediction  # noqa: E402
-from mpa.task_types import classify, label  # noqa: E402
+from mpa.task_types import LABELS, classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
@@ -50,6 +51,7 @@ ss.setdefault("messages", [])          # user / assistant turns
 ss.setdefault("session_id", uuid.uuid4().hex[:6])
 ss.setdefault("open_sources", set())   # keys of source panels currently open
 ss.setdefault("pending_prompt", None)
+ss.setdefault("pending_redo", None)     # index of a reply to rewrite after "Not for ..."
 ss.setdefault("flash", [])             # short confirmations shown as toasts
 ss.setdefault("influence_check", True)  # show the counterfactual check (turn off for study sessions)
 # Study mode adds the outcome measures from Assignment 1 (Section 04) and hides the influence check.
@@ -125,7 +127,15 @@ def not_for_task(msg_index: int, memory_id: str) -> None:
                         "undone": False,
                         "text": f"Got it. I won't use “{mem['text']}” for {label(task)}. "
                                 "Here's that reply again without it."})
-    redo = respond(msg["user_text"], history_of(msg))   # same history as the reply being corrected
+    ss.pending_redo = msg_index   # rewritten in the page script, so a progress message can show
+
+
+def run_pending_redo() -> None:
+    """Rewrite a corrected reply, with the same history it was sent with."""
+    msg = ss.messages[ss.pending_redo]
+    ss.pending_redo = None
+    with st.spinner("Rewriting the reply without that memory…"):
+        redo = respond(msg["user_text"], history_of(msg))
     redo["regenerated_from"] = msg["turn_id"]
     ss.messages.append(redo)
 
@@ -138,6 +148,16 @@ def undo_exclusion(notice_index: int) -> None:
     notice["undone"] = True
     log("undo_not_for_task", task=notice["task"], memory_id=notice["memory_id"])
     ss.flash.append(f"Undone: I'll use that memory for {label(notice['task'])} again.")
+
+
+def exclude_from_panel(memory_id: str) -> None:
+    """Scoped correction from the memory panel, without waiting for a reply that uses it."""
+    task = ss.get(f"nft_pick_{memory_id}")
+    if not task or store.get(memory_id) is None:
+        return
+    store.exclude_for_task(memory_id, task)
+    log("not_for_task", task=task, memory_id=memory_id, detail="from memory panel")
+    ss.flash.append(f"I won't use that memory for {label(task)} any more.")
 
 
 def use_again(memory_id: str, task: str) -> None:
@@ -163,7 +183,7 @@ def forget(memory_id: str, turn_id: str = "") -> None:
             m["record"].redact_memory(memory_id)
             for r in m.get("influence") or []:
                 if r.id == memory_id:
-                    r.text, r.evidence = "[forgotten]", "[forgotten]"
+                    r.text, r.evidence, r.reply_without = "[forgotten]", "[forgotten]", "[forgotten]"
     ss.open_sources = {k for k in ss.open_sources if not k.endswith(memory_id)}
     log("memory_forgotten", turn_id=turn_id, memory_id=memory_id)
     ss.flash.append("Forgotten. It's gone from memory and from the records of past replies.")
@@ -182,6 +202,7 @@ def reset_demo() -> None:
     ss.messages = []
     ss.open_sources = set()
     ss.awaiting_prediction = None
+    ss.pending_redo = None
     log("demo_reset")
     ss.flash.append("Demo reset: memories restored and chat cleared.")
 
@@ -191,6 +212,7 @@ def clear_chat() -> None:
     ss.messages = []
     ss.open_sources = set()
     ss.awaiting_prediction = None
+    ss.pending_redo = None
     log("chat_cleared")
     ss.flash.append("Chat cleared. Your memories and corrections are kept.")
 
@@ -224,16 +246,20 @@ def render_edit_forget(cols, mem: dict, key: str, turn_id: str = "") -> None:
                   on_click=forget, args=(mem["id"], turn_id))
 
 
-def render_memory_chip(msg_index: int, msg: dict, used: dict) -> None:
+def render_memory_chip(msg_index: int, msg: dict, used: dict, note: str | None = None) -> None:
+    """One memory under a reply, with its controls. Used for memories the assistant
+    claimed and for memories that were sent but not claimed."""
     mem = store.get(used["id"])
     key = f"{msg['turn_id']}:{used['id']}"
     with st.container(border=True):
         if mem is None:
-            st.caption("A memory used in this reply has since been forgotten.")
+            st.caption("A memory sent with this reply has since been forgotten.")
             return
         st.markdown(f"🧠 **{mem['text']}**" + ("  _(edited by you)_" if mem.get("edited") else ""))
         if used["how"]:
             st.caption(f"How it was applied: {used['how']}")
+        if note:
+            st.caption(note)
         is_open = key in ss.open_sources
         cols = st.columns([2.2, 2.2, 1, 1]) if SHOW_SOURCES else st.columns([2.2, 1, 1])
         if SHOW_SOURCES:
@@ -253,10 +279,29 @@ def render_memory_chip(msg_index: int, msg: dict, used: dict) -> None:
 
 
 VERDICT_LABELS = {
+    "fits, no difference": "➖ Fits the reply, but it would be the same without it",
     "unreported influence": "⚠️ Changed the reply, but the assistant didn't list it",
     "claimed, no measurable influence": "⚠️ Listed by the assistant, but made no measurable difference",
     "unclear": "❔ Couldn't tell",
 }
+
+
+def clear_influence(msg_index: int) -> None:
+    ss.messages[msg_index].pop("influence", None)
+
+
+def influence_label(r) -> str:
+    if r.verdict == "agrees":
+        return "✅ Used, as the assistant said" if r.influenced else "✅ Not used, as the assistant said"
+    return VERDICT_LABELS[r.verdict]
+
+
+def check_note(msg: dict, memory_id: str) -> str | None:
+    """The influence check's verdict for one memory, shown on its chip."""
+    for r in msg.get("influence") or []:
+        if r.id == memory_id:
+            return f"Measured by the check: {influence_label(r)}"
+    return None
 
 
 def memories_as_sent(msg: dict) -> list[dict]:
@@ -277,7 +322,8 @@ def run_influence_check(msg_index: int) -> dict:
     msg["influence"] = results
     counts = summarise(results)
     log("influence_checked", turn_id=msg["turn_id"], task=rec.task,
-        detail=";".join(f"{r.id}={r.verdict}" for r in results))
+        detail=";".join(f"{r.id}={r.verdict}" for r in results)
+        + (f";judge={judge.model}/{JUDGE_PROMPT_VERSION}" if judge is not None else ""))
     return counts
 
 
@@ -301,20 +347,22 @@ def render_influence(msg_index: int, msg: dict) -> None:
     with st.container(border=True):
         st.markdown("**Which memories mattered (measured, not self-reported)**")
         if judge is not None:
-            st.caption(f"Judged by {judge.model}, one reply at a time.")
+            st.caption(f"Judged by {judge.model} (judge prompt {JUDGE_PROMPT_VERSION}), one reply at a time.")
         if not results:
             st.caption("No memories were sent with this request, so there was nothing to test.")
             return
+        st.button("↻ Run the check again", key=f"infl_again_{msg['turn_id']}",
+                  on_click=clear_influence, args=(msg_index,),
+                  help="Clears this result so the check can run again on the same reply, "
+                       "e.g. after the judge has changed. Each run is logged with its judge version.")
         for r in results:
             said = "listed it" if r.reported else "didn't list it"
             changed = {True: "changed the reply", False: "made no difference", None: "unclear"}[r.influenced]
-            if r.verdict == "agrees":
-                label_text = ("✅ Used, as the assistant said" if r.influenced
-                              else "✅ Not used, as the assistant said")
-            else:
-                label_text = VERDICT_LABELS[r.verdict]
-            st.markdown(f"🧠 {r.text}  \n{label_text}")
+            st.markdown(f"🧠 {r.text}  \n{influence_label(r)}")
             st.caption(f"Assistant {said} · removing it {changed} · {r.evidence}")
+            if r.reply_without and r.reply_without != "[forgotten]":
+                with st.popover("See the reply without this memory"):
+                    st.markdown(tame_headings(r.reply_without))
         mismatches = [r for r in results if r.verdict in ("unreported influence",
                                                           "claimed, no measurable influence")]
         if mismatches:
@@ -324,15 +372,33 @@ def render_influence(msg_index: int, msg: dict) -> None:
 
 def render_reply(msg_index: int, msg: dict) -> None:
     reply: ValidatedReply = msg["reply"]
-    st.markdown(reply.answer)
+    rec = msg["record"]
+    st.markdown(tame_headings(reply.answer))
     if reply.note:
         st.warning(reply.note)
+    # 1. memories the assistant says it used
     if reply.used:
-        st.markdown("**Memories used in this reply**")
+        st.markdown("**Memories used in this reply** _(as reported by the assistant)_")
         for used in reply.used:
-            render_memory_chip(msg_index, msg, used)
+            render_memory_chip(msg_index, msg, used, note=check_note(msg, used["id"]))
     elif reply.parse_ok:
         st.caption("The assistant didn't report using any memories.")
+    # 2. memories that were sent but not claimed: the assistant could still have used them
+    claimed = {u["id"] for u in reply.used}
+    unclaimed = [m for m in rec.memories_sent if m["id"] not in claimed]
+    if unclaimed:
+        flagged = {r.id for r in msg.get("influence") or [] if r.verdict == "unreported influence"}
+        title = f"Also sent with this request, not listed by the assistant ({len(unclaimed)})"
+        with st.expander(("⚠️ " if flagged else "") + title, expanded=bool(flagged)):
+            st.caption("The assistant could see these memories while writing the reply, "
+                       "so it may have used them without saying so. You can correct them here too.")
+            for m in sorted(unclaimed, key=lambda m: m["id"] not in flagged):   # flagged first
+                render_memory_chip(msg_index, msg, {"id": m["id"], "how": ""},
+                                   note=check_note(msg, m["id"]))
+    # 3. memories that were not sent, e.g. because the user restricted them
+    for w in rec.memories_withheld:
+        mem = store.get(w["id"])
+        st.caption(f"⛔ Not sent: {mem['text'] if mem else '[forgotten]'} ({w['reason']})")
     verdict = msg.get("verdict")
     if verdict:
         st.caption("You marked this reply as working for you." if verdict == "accepted"
@@ -388,6 +454,13 @@ def render_memory_panel() -> None:
                 st.caption(f"⛔ Not used for {label(task)}")
                 st.button(f"Use for {label(task)} again", key=f"again_{mem['id']}_{task}",
                           on_click=use_again, args=(mem["id"], task), use_container_width=True)
+            available = [t for t in LABELS if t not in mem["excluded_tasks"]]
+            if available:
+                with st.popover("Don't use for…", use_container_width=True):
+                    st.selectbox("Kind of request", available, format_func=label,
+                                 key=f"nft_pick_{mem['id']}")
+                    st.button("Apply", key=f"nft_apply_{mem['id']}", on_click=exclude_from_panel,
+                              args=(mem["id"],))
             if SHOW_SOURCES:
                 st.button("Hide source" if key in ss.open_sources else "Show source",
                           key=f"src_{key}", on_click=toggle_source, args=(key, mem["id"]),
@@ -491,6 +564,10 @@ def render_prediction_step() -> None:
     ss.awaiting_prediction = None
     st.rerun()
 
+
+if ss.pending_redo is not None:
+    run_pending_redo()
+    st.rerun()
 
 if ss.awaiting_prediction:
     render_prediction_step()
