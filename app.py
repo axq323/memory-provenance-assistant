@@ -19,6 +19,7 @@ from mpa.counterfactual import calls_needed, check_influence, summarise  # noqa:
 from mpa.interaction_log import log_event  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
+from mpa.study import ground_truth, score_prediction  # noqa: E402
 from mpa.task_types import classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
 
@@ -51,6 +52,10 @@ ss.setdefault("open_sources", set())   # keys of source panels currently open
 ss.setdefault("pending_prompt", None)
 ss.setdefault("flash", [])             # short confirmations shown as toasts
 ss.setdefault("influence_check", True)  # show the counterfactual check (turn off for study sessions)
+# Study mode adds the outcome measures from Assignment 1 (Section 04) and hides the influence check.
+# A researcher can switch it on per participant with ?study=1 in the URL.
+ss.setdefault("study_mode", st.query_params.get("study", "0") == "1")
+ss.setdefault("awaiting_prediction", None)  # prompt waiting for the participant's prediction
 # Study condition: A = memories with source context, B = memories only.
 # A researcher can fix it per participant with ?condition=B in the URL.
 ss.setdefault("condition", "B" if st.query_params.get("condition", "A").upper() == "B" else "A")
@@ -176,6 +181,7 @@ def reset_demo() -> None:
     store.reset()
     ss.messages = []
     ss.open_sources = set()
+    ss.awaiting_prediction = None
     log("demo_reset")
     ss.flash.append("Demo reset: memories restored and chat cleared.")
 
@@ -184,6 +190,7 @@ def clear_chat() -> None:
     """Start a fresh conversation but keep the memories and the user's corrections."""
     ss.messages = []
     ss.open_sources = set()
+    ss.awaiting_prediction = None
     log("chat_cleared")
     ss.flash.append("Chat cleared. Your memories and corrections are kept.")
 
@@ -336,7 +343,7 @@ def render_reply(msg_index: int, msg: dict) -> None:
                   on_click=set_verdict, args=(msg_index, "accepted"))
         c2.button("👎 Something's off", key=f"flag_{msg['turn_id']}",
                   on_click=set_verdict, args=(msg_index, "flagged"))
-    if ss.get("influence_check"):
+    if ss.get("influence_check") and not ss.get("study_mode"):
         render_influence(msg_index, msg)
     if ss.get("researcher_view"):
         render_record(msg)
@@ -349,6 +356,10 @@ def render_record(msg: dict) -> None:
         st.markdown(f"- **Task type:** {label(rec.task)} (trigger: `{rec.trigger or 'none'}`)\n"
                     f"- **Prompt version:** {rec.prompt_version} · **Model:** {model.name}\n"
                     f"- **History turns sent:** {rec.history_turns_sent}")
+        if msg.get("prediction"):
+            p = msg["prediction"]
+            st.markdown(f"- **Participant predicted:** {', '.join(p['predicted']) or 'none'} "
+                        f"(exact match: {p['exact']}, overlap: {p['jaccard']})")
         st.markdown("**Memories sent**")
         st.json(rec.memories_sent, expanded=True)
         if rec.memories_withheld:
@@ -403,6 +414,9 @@ with st.sidebar:
                  format_func=lambda c: {"A": "A: memories + source context",
                                         "B": "B: memories only"}[c])
         st.toggle("Researcher view", key="researcher_view")
+        st.toggle("Study mode", key="study_mode",
+                  help="Adds the prediction step, fit questions and end-of-session questionnaire, "
+                       "and hides the influence check.")
         st.toggle("Memory influence check", key="influence_check",
                   help="Turn off during study sessions so both conditions see the same interface.")
         st.button("Clear chat (keep memories)", key="clear_chat", on_click=clear_chat,
@@ -422,7 +436,8 @@ if MODE == "replay":
     cols = st.columns(len(model.scenarios))
     for col, scenario in zip(cols, model.scenarios):
         col.button(scenario["prompt"], key=f"demo_{scenario['id']}", on_click=queue_prompt,
-                   args=(scenario["prompt"],), use_container_width=True)
+                   args=(scenario["prompt"],), use_container_width=True,
+                   disabled=bool(ss.awaiting_prediction))
 
 for i, msg in enumerate(ss.messages):
     if msg["role"] == "notice":
@@ -439,12 +454,56 @@ for i, msg in enumerate(ss.messages):
         else:
             render_reply(i, msg)
 
-typed = st.chat_input("Ask your assistant anything…")
+def render_prediction_step() -> None:
+    """Study mode: ask which memories the participant expects, before showing the reply."""
+    memories = store.all()
+    with st.chat_message("assistant", avatar="🔮"):
+        with st.form("prediction_form"):
+            st.markdown("**Before you see the reply:** which of your memories do you expect "
+                        "the assistant to use?")
+            for mem in memories:
+                st.checkbox(mem["text"], key=f"pred_{mem['id']}")
+            st.checkbox("None of them", key="pred_none")
+            submitted = st.form_submit_button("Show me the reply")
+    if not submitted:
+        return
+    predicted = {m["id"] for m in memories if ss.get(f"pred_{m['id']}")}
+    if not predicted and not ss.get("pred_none"):
+        st.warning("Tick at least one memory, or “None of them”.")
+        return
+    if predicted and ss.get("pred_none"):
+        st.warning("You ticked “None of them” and a memory. Please choose one or the other.")
+        return
+    prompt = ss.awaiting_prediction
+    with st.spinner("Thinking…"):
+        reply_msg = respond(prompt, history_before(len(ss.messages) - 1))
+    used = {u["id"] for u in reply_msg["reply"].used}
+    score = score_prediction(predicted, used)
+    truth = ground_truth(prompt)
+    reply_msg["prediction"] = {"predicted": sorted(predicted), **score}
+    ss.messages.append(reply_msg)
+    log("prediction_made", turn_id=reply_msg["turn_id"], task=reply_msg["task"],
+        detail=f"predicted={','.join(sorted(predicted)) or 'none'};used={','.join(sorted(used)) or 'none'};"
+               f"exact={score['exact']};jaccard={score['jaccard']};"
+               f"scenario={truth['scenario'] if truth else 'unknown'}")
+    for key in [f"pred_{m['id']}" for m in memories] + ["pred_none"]:
+        ss.pop(key, None)
+    ss.awaiting_prediction = None
+    st.rerun()
+
+
+if ss.awaiting_prediction:
+    render_prediction_step()
+
+typed = st.chat_input("Ask your assistant anything…", disabled=bool(ss.awaiting_prediction))
 prompt = typed or ss.pending_prompt
 ss.pending_prompt = None
-if prompt:
+if prompt and not ss.awaiting_prediction:
     history = history_before(len(ss.messages))
     ss.messages.append({"role": "user", "text": prompt})
-    with st.spinner("Thinking…"):
-        ss.messages.append(respond(prompt, history))
+    if ss.study_mode:
+        ss.awaiting_prediction = prompt            # reply is generated after the prediction
+    else:
+        with st.spinner("Thinking…"):
+            ss.messages.append(respond(prompt, history))
     st.rerun()

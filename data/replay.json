@@ -1,11 +1,13 @@
 {
-  "_note": "SIMULATED model replies for replay mode. Each scenario lists the memories it could use (candidates) and one scripted reply per combination of candidates present in the context. The reply chosen depends on what context assembly actually sent, so user corrections (Not for this task, Forget) change the reply exactly as they would in live mode. Edited memory wording does not change scripted text.",
+  "_note": "SIMULATED model replies for replay mode. Each scenario lists the memories it could use (candidates) and one scripted reply per combination of candidates present in the context. The reply chosen depends on what context assembly actually sent, so user corrections (Not for this task, Forget) change the reply exactly as they would in live mode. Edited memory wording does not change scripted text. Each scenario also records ground truth for the planned study: which candidate memories fit the request and which would be misapplied (used by mpa/study.py to score predictions, fit judgements and reliance).",
   "scenarios": [
     {
       "id": "S1-dinner",
       "label": "Dinner tonight (memories fit)",
       "prompt": "Can you suggest something I could make for dinner tonight?",
       "candidates": ["m3", "m4"],
+      "fits": ["m3", "m4"],
+      "misapplied": [],
       "variants": [
         {
           "uses": [
@@ -33,6 +35,8 @@
       "label": "Explain solar panels (memory misapplied)",
       "prompt": "I don't really understand how solar panels work. Can you explain it properly, step by step?",
       "candidates": ["m1"],
+      "fits": [],
+      "misapplied": ["m1"],
       "variants": [
         {
           "uses": [{"id": "m1", "how": "Kept the explanation to short bullet points"}],
@@ -49,6 +53,8 @@
       "label": "Birthday message (memory misapplied)",
       "prompt": "Can you write a birthday message for my best friend Sam? Something warm and a bit funny.",
       "candidates": ["m2"],
+      "fits": [],
+      "misapplied": ["m2"],
       "variants": [
         {
           "uses": [{"id": "m2", "how": "Wrote the message in a formal, professional tone"}],

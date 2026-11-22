@@ -200,3 +200,73 @@ def test_no_report_caption_does_not_claim_no_memories_were_used(app):
     captions = [c.value for c in app.caption]
     assert "The assistant didn't report using any memories." in captions
     assert not any("No stored memories were used" in c for c in captions)
+
+
+def _submit_prediction(app):
+    # tick boxes and submit in the same run, as a real form submission does
+    next(b for b in app.button if b.label == "Show me the reply").click().run()
+
+
+def _study(app):
+    app.toggle(key="study_mode").set_value(True).run()
+    return app
+
+
+def test_study_mode_asks_for_a_prediction_before_the_reply(app):
+    _study(app)
+    _button(app, "Can you write a birthday message").click().run()
+    assert not app.exception
+    assert any("which of your memories do you expect" in m.value for m in app.markdown)
+    assert not any(m["role"] == "assistant" for m in app.session_state["messages"])   # no reply yet
+
+
+def test_prediction_is_logged_against_what_was_used(app, tmp_path):
+    _study(app)
+    _button(app, "Can you write a birthday message").click().run()
+    app.checkbox(key="pred_m2").check()
+    _submit_prediction(app)
+    assert not app.exception
+    reply = app.session_state["messages"][-1]
+    assert reply["role"] == "assistant" and reply["prediction"]["exact"] is True
+    log = (tmp_path / "interaction_log.csv").read_text()
+    assert "prediction_made" in log
+    assert "predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday" in log
+
+
+def test_none_of_them_and_empty_prediction(app, tmp_path):
+    _study(app)
+    _button(app, "Can you suggest something I could make").click().run()
+    _submit_prediction(app)
+    assert any("Tick at least one" in w.value for w in app.warning)               # nothing ticked
+    app.checkbox(key="pred_none").check()
+    _submit_prediction(app)
+    assert not app.exception
+    log = (tmp_path / "interaction_log.csv").read_text()
+    assert "predicted=none;used=m3,m4;exact=False;jaccard=0.0;scenario=S1-dinner" in log
+
+
+def test_study_mode_hides_the_influence_check(app):
+    _study(app)
+    _button(app, "Can you suggest something I could make").click().run()
+    app.checkbox(key="pred_m3").check()
+    _submit_prediction(app)
+    assert not any((b.key or "").startswith("infl_") for b in app.button)
+
+
+def test_study_mode_from_url(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODE", "replay")
+    monkeypatch.setenv("MPA_RUNTIME_DIR", str(tmp_path))
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.query_params["study"] = "1"
+    at.run()
+    assert at.session_state["study_mode"] is True
+
+
+def test_clear_chat_cancels_a_pending_prediction(app):
+    app.toggle(key="study_mode").set_value(True).run()
+    app.chat_input[0].set_value(DINNER).run()
+    assert app.session_state["awaiting_prediction"] == DINNER
+    app.button(key="clear_chat").click().run()
+    assert not app.exception
+    assert app.session_state["awaiting_prediction"] is None
+    assert app.session_state["messages"] == []
