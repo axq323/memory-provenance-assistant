@@ -5,6 +5,7 @@ Usage (from the repo root):
     python eval/summarise_sessions.py logs/*.csv                             # several downloaded logs
     python eval/summarise_sessions.py --include-incomplete                   # also unfinished sessions
     python eval/summarise_sessions.py eval/sample_session_log_SIMULATED.csv  # the simulated sample
+    python eval/summarise_sessions.py --codes eval/reason_codes/<sheet>.csv   # + coded reasons
 
 Prints the tables and writes, to eval/session_summaries/:
     <timestamp>_sessions.csv    one row per session
@@ -52,6 +53,8 @@ def main() -> None:
                         help="include sessions that did not finish the questionnaire")
     parser.add_argument("--note", default="", help="e.g. 'simulated sample'")
     parser.add_argument("--out", default=str(OUT_DIR), help="folder for the result files")
+    parser.add_argument("--codes", default="", help="coded reasons sheet (eval/code_reasons.py) for "
+                                                    "'named the scope error'")
     args = parser.parse_args()
     out_dir = Path(args.out)
     # Windows consoles and pipes may use a legacy code page: never crash on a character it lacks
@@ -62,7 +65,14 @@ def main() -> None:
     if not paths:
         parser.error("no log files found; run a session first, or pass a downloaded log's path")
     rows = load_rows(paths)
-    sessions = summarise_sessions(rows)
+    codes = None
+    if args.codes:
+        from mpa.reason_coding import load_codes
+        codes, problems = load_codes(Path(args.codes))
+        if problems:
+            print(f"Warning: {len(problems)} reasons in {args.codes} aren't coded yet; "
+                  "they're left out of 'named the scope error'.")
+    sessions = summarise_sessions(rows, codes)
     if not sessions:
         print("No evaluation sessions found (an evaluation session has at least one prediction).")
         return

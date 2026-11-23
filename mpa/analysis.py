@@ -6,8 +6,12 @@ so a session with more tasks does not count more than one with fewer.
 
   predictive understanding  prediction_made  -> exact-match rate, mean overlap (Jaccard)
   applicability judgement   fit_judged       -> accuracy against ground truth, "not sure" rate;
-                                                scope error identified = judged a misapplied
-                                                memory as not suiting the request (diagnosis)
+                                                judged a misapplied memory unsuitable (the fit
+                                                answer only: "too formal" counts, so it does
+                                                not show the person knew WHY)
+  scope diagnosis           reason_given     -> named the scope error, from the written reasons
+                            + coded sheet       coded by hand (mpa/reason_coding.py); only when a
+                                                coded sheet is passed in
   correction                task_finished    -> on replies with a misapplied memory: restricted
                                                 for that kind of request and kept ("scoped", the
                                                 appropriate fix) vs forgotten (over-correction).
@@ -49,7 +53,8 @@ MEASURES = [
     ("prediction_overlap", "Prediction: mean overlap (0-1)", True),
     ("fit_accuracy", "Fit judgement: accuracy", True),
     ("fit_unsure", "Fit judgement: 'not sure' rate", None),
-    ("scope_error_identified", "Diagnosis: misapplied memory judged unsuitable", True),
+    ("misapplied_judged_unsuitable", "Diagnosis: judged the misapplied memory unsuitable (fit answer)", True),
+    ("scope_named", "Diagnosis: named the scope error (coded reasons)", True),
     ("correction_scoped", "Correction: scoped and kept (appropriate)", True),
     ("correction_forgot", "Correction: forgotten instead (over-correction)", False),
     ("reliance_appropriate", "Reliance: appropriate rate", True),
@@ -104,8 +109,11 @@ def _avg(values: list[float]) -> float | None:
     return round(mean(values), 3) if values else None
 
 
-def summarise_session(rows: list[dict]) -> dict | None:
-    """Outcomes for one session, or None if it has no evaluation tasks."""
+def summarise_session(rows: list[dict], codes: dict | None = None) -> dict | None:
+    """Outcomes for one session, or None if it has no evaluation tasks.
+
+    codes: {(session_id, trial_id): "scope" | "mismatch" | "none"} from a coded reasons sheet.
+    Without it, scope_named is None (not measured)."""
     predictions = [parse_detail(r["detail"]) for r in rows if r["event"] == "prediction_made"]
     if not predictions:
         return None
@@ -122,6 +130,10 @@ def summarise_session(rows: list[dict]) -> dict | None:
     scored_fits = [f for f in fits if f.get("correct") in ("True", "False")]
     misapplied_fits = [f for f in fits if f.get("truth") == "misapplied"]
     with_misapplied = [t for t in tasks if t.get("misapplied_shown", "none") != "none" and "correction" in t]
+    misapplied_trials = {r.get("trial_id", "") for r in rows if r["event"] == "task_finished"
+                         and parse_detail(r["detail"]).get("misapplied_shown", "none") != "none"}
+    coded = [codes[(rows[0]["session_id"], t)] for t in sorted(misapplied_trials)
+             if codes and (rows[0]["session_id"], t) in codes]
     annotated = [t for t in tasks if t.get("reliance") not in (None, "n/a")]
     judged = [t for t in annotated if t["reliance"] != "no decision"]
     misapplied = [t for t in judged if t.get("misapplied_shown", "none") != "none"]
@@ -137,7 +149,8 @@ def summarise_session(rows: list[dict]) -> dict | None:
         "prediction_overlap": _avg([float(p["jaccard"]) for p in predictions if "jaccard" in p]),
         "fit_accuracy": _rate([f["correct"] == "True" for f in scored_fits]),
         "fit_unsure": _rate([f.get("answer") == "unsure" for f in fits]),
-        "scope_error_identified": _rate([f.get("answer") == "no" for f in misapplied_fits]),
+        "misapplied_judged_unsuitable": _rate([f.get("answer") == "no" for f in misapplied_fits]),
+        "scope_named": _rate([c == "scope" for c in coded]),
         "correction_scoped": _rate([t["correction"].split("+")[0] == "scoped" for t in with_misapplied]),
         "correction_forgot": _rate([t["correction"].split("+")[0] == "forgot" for t in with_misapplied]),
         "reliance_appropriate": _rate([t["reliance"] == "appropriate" for t in judged]),
@@ -153,8 +166,8 @@ def summarise_session(rows: list[dict]) -> dict | None:
     return s
 
 
-def summarise_sessions(rows: list[dict]) -> list[dict]:
-    out = [summarise_session(r) for r in by_session(rows).values()]
+def summarise_sessions(rows: list[dict], codes: dict | None = None) -> list[dict]:
+    out = [summarise_session(r, codes) for r in by_session(rows).values()]
     return [s for s in out if s is not None]
 
 

@@ -95,8 +95,9 @@ def test_session_outcomes(log):
     assert p2["over_reliance"] == 1.0 and p2["under_reliance"] is None  # no suitable-reply task
     assert p2["fit_accuracy"] == 0.0 and p2["q_effort"] == 3
     # diagnosis and correction are separate outcomes
-    assert p1["scope_error_identified"] == 1.0 and p1["correction_scoped"] == 1.0
-    assert p2["scope_error_identified"] == 0.0 and p2["correction_scoped"] is None   # older log rows
+    assert p1["misapplied_judged_unsuitable"] == 1.0 and p1["correction_scoped"] == 1.0
+    assert p2["misapplied_judged_unsuitable"] == 0.0 and p2["correction_scoped"] is None   # older log rows
+    assert p1["scope_named"] is None                    # not measured without a coded reasons sheet
     p3 = _people(log)["p3"]
     assert p3["correction_forgot"] == 1.0 and p3["correction_scoped"] == 0.0
 
