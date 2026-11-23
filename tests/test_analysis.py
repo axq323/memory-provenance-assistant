@@ -185,3 +185,13 @@ def test_the_simulated_sample_log_analyses(tmp_path):
     people = summarise_sessions(load_rows([sample]))
     assert len(people) == 4 and {p["condition"] for p in people} == {"A", "B"}
     assert all(p["mode"] == "replay" and p["complete"] for p in people)
+
+
+def test_the_sample_log_script_reproduces_four_complete_sessions(tmp_path):
+    out = tmp_path / "sample.csv"
+    res = subprocess.run([sys.executable, str(ROOT / "eval" / "make_sample_log.py"), "--out", str(out)],
+                         capture_output=True, text=True, cwd=ROOT)
+    assert res.returncode == 0, res.stderr
+    people = summarise_sessions(load_rows([out]))
+    assert len(people) == 4 and all(p["complete"] and p["tasks"] == 4 for p in people)
+    assert sorted(p["condition"] for p in people) == ["A", "A", "B", "B"]

@@ -18,8 +18,19 @@ Conditions:
              formal-tone (m2) memories are not used for personal messages.
              Measures whether scoped correction fixes the over-application cases.
 
-Note: the criteria score what the model REPORTS using. A memory can shape a
-reply without being reported; only the influence check in the app measures that.
+What the score means: C1-C4 check the model's REPORT of which memories it
+used (memories_used), not the reply itself. So a score here is a score on
+these automated reporting criteria, not a measure of how well memories were
+applied. Two known blind spots:
+  - a reply that doesn't answer the request ("I do not know") passes if it
+    lists the expected memories;
+  - a reply written in the misapplied style (a formal birthday message) passes
+    C4 if the model reports using no memories.
+The results CSV keeps each reply's text, so a run can be checked by hand:
+    python eval/manual_check.py make eval/results/<file>.csv
+    python eval/manual_check.py score eval/manual_checks/<sheet>.csv
+A memory can also shape a reply without being reported; only the influence
+check in the app measures that.
 """
 
 from __future__ import annotations
@@ -55,6 +66,20 @@ CONDITIONS = {
 }
 
 
+MANUAL_SECTION = "\n## Manual checks"
+
+
+def append_log_row(row: str, path: Path = PROMPT_LOG) -> None:
+    """Add a run to the runs table, which ends where the Manual checks section starts."""
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    if MANUAL_SECTION in text:
+        i = text.index(MANUAL_SECTION)
+        text = text[:i].rstrip("\n") + "\n" + row + "\n" + text[i:]
+    else:
+        text = text.rstrip("\n") + "\n" + row + "\n"
+    path.write_text(text, encoding="utf-8")
+
+
 def score_case(case: dict, model, store: MemoryStore, prompt_version: str | None = None) -> dict:
     task, trigger = classify(case["prompt"])
     record = assemble(case["prompt"], store.all(), task, trigger, prompt_version=prompt_version)
@@ -62,7 +87,7 @@ def score_case(case: dict, model, store: MemoryStore, prompt_version: str | None
         reply = validate(model.generate(record, case["prompt"]), record.sent_ids)
     except ModelError as exc:
         return {"id": case["id"], "task": task, "used": "", "dropped": "", "C1": False, "C2": False,
-                "C3": False, "C4": False, "pass": False, "error": str(exc)}
+                "C3": False, "C4": False, "pass": False, "error": str(exc), "answer": ""}
     used = {u["id"] for u in reply.used}
     checks = {
         "C1": reply.parse_ok,
@@ -72,7 +97,7 @@ def score_case(case: dict, model, store: MemoryStore, prompt_version: str | None
     }
     return {"id": case["id"], "task": task, "used": ",".join(sorted(used)),
             "dropped": ",".join(d["id"] for d in reply.dropped), **checks,
-            "pass": all(checks.values()), "error": ""}
+            "pass": all(checks.values()), "error": "", "answer": reply.answer}
 
 
 def run_once(cases: list[dict], model, condition: str, prompt_version: str) -> list[dict]:
@@ -141,7 +166,8 @@ def main() -> None:
             print(f"{s['id']:5} {s['task']:16} {s['passed']}/{s['runs']:<5} {s['failed']:12} {s['reported']}")
     score_text = (f"{scores[0]}/{n}" if args.repeat == 1 else
                   f"mean {sum(scores) / len(scores):.1f}/{n} (runs: {', '.join(map(str, scores))})")
-    print(f"\n{score_text} · mode={mode} · model={model.name} · prompt {args.prompt} "
+    print(f"\n{score_text} on the automated criteria C1-C4 (what the model reports using) "
+          f"· mode={mode} · model={model.name} · prompt {args.prompt} "
           f"· condition={args.condition}")
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -154,10 +180,10 @@ def main() -> None:
         for i, rows in enumerate(runs, start=1):
             writer.writerows({"run": i, "prompt": args.prompt, "condition": args.condition, **r} for r in rows)
     note = (f"[{args.condition}] " if args.condition != "default" else "") + (args.note or "—")
-    with PROMPT_LOG.open("a", encoding="utf-8") as f:
-        f.write(f"| {stamp} | {args.prompt} | {mode}: {model.name} | {score_text} "
-                f"| {note} | `{out.relative_to(ROOT)}` |\n")
+    append_log_row(f"| {stamp} | {args.prompt} | {mode}: {model.name} | {score_text} "
+                   f"| {note} | `{out.relative_to(ROOT)}` |")
     print(f"Results: {out.relative_to(ROOT)} · logged in eval/prompt_log.md")
+    print(f"To check the replies by hand: python eval/manual_check.py make {out.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
