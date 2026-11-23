@@ -55,6 +55,13 @@ def log(tmp_path):
                                     "sources_opened=0;seconds=20;misapplied_shown=m2;reliance=over-reliance"),
         ("fit_judged", "t3", "m2", "answer=yes;truth=misapplied;correct=False;scenario=S3-birthday"),
     ] + _questionnaire(4, 5))
+    # Session p4 (sources hidden): birthday -> only an unrelated memory corrected
+    _write(path, "p4", "B", [
+        ("prediction_made", "t5", "", "predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday"),
+        ("task_finished", "t5", "", "scenario=S3-birthday;accepted=False;flagged=False;corrected=m1;"
+                                    "sources_opened=0;seconds=40;misapplied_shown=m2;"
+                                    "reliance=unrelated correction;correction=none"),
+    ] + _questionnaire(4, 4))
     # Developer session without predictions (live testing): must be ignored
     _write(path, "dev", "A", [("reply_shown", "t9", "", "used=m2"), ("influence_checked", "t9", "", "m2=agrees")])
     # Incomplete session p3 (sources shown): one task, no questionnaire
@@ -78,7 +85,7 @@ def test_parse_detail_keeps_equals_signs_in_values():
 
 def test_only_study_sessions_are_analysed(log):
     people = _people(log)
-    assert set(people) == {"p1", "p2", "p3"}
+    assert set(people) == {"p1", "p2", "p3", "p4"}
     assert people["p1"]["complete"] and not people["p3"]["complete"]
 
 
@@ -102,10 +109,16 @@ def test_session_outcomes(log):
     assert p3["correction_forgot"] == 1.0 and p3["correction_scoped"] == 0.0
 
 
+def test_an_unrelated_correction_is_kept_out_of_the_reliance_rates(log):
+    p4 = _people(log)["p4"]
+    assert p4["unrelated_correction"] == 1.0
+    assert p4["over_reliance"] is None and p4["reliance_appropriate"] is None
+
+
 def test_condition_summary_excludes_incomplete_by_default(log):
     people = summarise_sessions(load_rows([log]))
     summary = summarise_conditions(people)
-    assert summary["A"]["n"] == 1 and summary["B"]["n"] == 1          # p3 left out
+    assert summary["A"]["n"] == 1 and summary["B"]["n"] == 2          # p3 left out
     assert summary["A"]["reliance_appropriate"]["mean"] == 1.0
     assert summarise_conditions(people, complete_only=False)["A"]["n"] == 2
 
@@ -135,7 +148,7 @@ def test_script_runs_and_writes_results(log, tmp_path):
                           "--out", str(out), "--note", "test data"],
                          capture_output=True, text=True, cwd=ROOT)
     assert res.returncode == 0, res.stderr
-    assert "evaluation sessions: 3 (2 complete) · summarised: 2" in res.stdout
+    assert "evaluation sessions: 4 (3 complete) · summarised: 3" in res.stdout
     assert {p.name.split("_", 1)[1] for p in out.iterdir()} == {"sessions.csv", "scenarios.csv",
                                                                  "summary.md"}
     assert "| Measure |" in next(out.glob("*_summary.md")).read_text(encoding="utf-8")

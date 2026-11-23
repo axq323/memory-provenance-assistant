@@ -21,8 +21,10 @@ so a session with more tasks does not count more than one with fewer.
                                                 misapplied replies (the risk that source context
                                                 lends them credibility, Assignment 1 Gap);
                                                 under-reliance on suitable replies;
-                                                "no decision" (finished without acting) is
-                                                reported on its own and left out of those rates
+                                                "no decision" (finished without acting) and
+                                                "unrelated correction" (only a memory that wasn't
+                                                in the reply was corrected) are reported on their
+                                                own and left out of those rates
   checking effort           task_finished    -> sources opened and seconds per task
   self-reported attitudes   questionnaire    -> mean per item, kept apart from behaviour
                                                 (Bucinca et al., 2021); effort reverse-scored
@@ -61,6 +63,7 @@ MEASURES = [
     ("over_reliance", "Over-reliance on misapplied replies", False),
     ("under_reliance", "Under-reliance on suitable replies", False),
     ("no_decision", "Reliance: no decision rate", None),
+    ("unrelated_correction", "Reliance: unrelated correction rate", None),
     ("sources_per_task", "Effort: sources opened per task", None),
     ("seconds_per_task", "Effort: seconds per task", None),
 ] + [(f"q_{i}", f"Questionnaire: {i}" + (" (reversed)" if i in REVERSED else ""), True)
@@ -135,7 +138,7 @@ def summarise_session(rows: list[dict], codes: dict | None = None) -> dict | Non
     coded = [codes[(rows[0]["session_id"], t)] for t in sorted(misapplied_trials)
              if codes and (rows[0]["session_id"], t) in codes]
     annotated = [t for t in tasks if t.get("reliance") not in (None, "n/a")]
-    judged = [t for t in annotated if t["reliance"] != "no decision"]
+    judged = [t for t in annotated if t["reliance"] not in ("no decision", "unrelated correction")]
     misapplied = [t for t in judged if t.get("misapplied_shown", "none") != "none"]
     suitable = [t for t in judged if t.get("misapplied_shown", "none") == "none"]
 
@@ -157,6 +160,7 @@ def summarise_session(rows: list[dict], codes: dict | None = None) -> dict | Non
         "over_reliance": _rate([t["reliance"] == "over-reliance" for t in misapplied]),
         "under_reliance": _rate([t["reliance"] == "under-reliance" for t in suitable]),
         "no_decision": _rate([t["reliance"] == "no decision" for t in annotated]),
+        "unrelated_correction": _rate([t["reliance"] == "unrelated correction" for t in annotated]),
         "sources_per_task": _avg([int(t.get("sources_opened", 0)) for t in tasks]),
         "seconds_per_task": _avg([int(t.get("seconds", 0)) for t in tasks]),
     }
@@ -203,7 +207,7 @@ def by_scenario(rows: list[dict], sessions: set[str] | None = None) -> list[dict
         elif r["event"] == "task_finished":
             cell = cells[(r["condition"], d.get("scenario", "unknown"))]
             cell["tasks"] += 1
-            if d.get("reliance") not in (None, "n/a", "no decision"):
+            if d.get("reliance") not in (None, "n/a", "no decision", "unrelated correction"):
                 cell["appropriate"].append(d["reliance"] == "appropriate")
     return [{"condition": c, "scenario": sc, "tasks": v["tasks"],
              "prediction_exact": _rate(v["exact"]), "fit_accuracy": _rate(v["fit"]),

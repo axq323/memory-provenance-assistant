@@ -1080,3 +1080,21 @@ def test_switching_the_setting_in_evaluation_mode_starts_a_new_session(app, tmp_
     _start_task(app, "Can you write a birthday message", ["m2"])
     sessions = summarise_sessions(load_rows(sorted((tmp_path / "sessions").glob("*/interaction_log.csv"))))
     assert sorted(s["condition"] for s in sessions) == ["A", "B"]          # never "mixed"
+
+
+# ------------------------------------------------- stage 10, part 3: unrelated corrections ---
+def test_correcting_an_unrelated_memory_is_not_over_reliance(app, tmp_path):
+    _start_task(app, "Can you write a birthday message", ["m2"])
+    app.selectbox(key="nft_pick_m1").set_value("personal_message").run()   # m1 isn't the misapplied one
+    app.button(key="nft_apply_m1").click().run()
+    app.button(key="task_done").click().run()
+    d = _finished(app, tmp_path)
+    assert "corrected=m1" in d and "reliance=unrelated correction" in d
+
+
+def test_correcting_an_unrelated_memory_on_a_fitting_reply_is_not_appropriate_either(app, tmp_path):
+    _start_task(app, "Can you suggest something I could make", ["m3", "m4"])
+    app.selectbox(key="nft_pick_m2").set_value("cooking").run()
+    app.button(key="nft_apply_m2").click().run()
+    app.button(key="task_done").click().run()
+    assert "reliance=unrelated correction" in _finished(app, tmp_path)

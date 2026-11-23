@@ -55,7 +55,10 @@ def test_reliance_outcomes():
     assert reliance({"m2"}, set(), _b(corrected=["m2"])) == "appropriate"
     assert reliance({"m2"}, set(), _b(accepted=True)) == "over-reliance"
     assert reliance({"m2"}, set(), _b()) == "no decision"                       # did nothing
-    assert reliance({"m2"}, set(), _b(corrected=["m3"])) == "over-reliance"     # corrected the wrong memory
+    assert reliance({"m2"}, set(), _b(corrected=["m3"])) == "unrelated correction"  # never accepted the reply
+    assert reliance({"m2"}, set(), _b(accepted=True, corrected=["m3"])) == "over-reliance"
+    assert reliance(set(), {"m3", "m4"}, _b(corrected=["m1"])) == "unrelated correction"  # was "appropriate"
+    assert reliance(set(), {"m3", "m4"}, _b(accepted=True, corrected=["m1"])) == "appropriate"
     assert reliance(set(), {"m3", "m4"}, _b()) == "no decision"
     # only fitting memories: accepting is appropriate, questioning them is under-reliance
     assert reliance(set(), {"m3", "m4"}, _b(accepted=True)) == "appropriate"

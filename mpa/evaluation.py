@@ -139,26 +139,33 @@ def reliance(misapplied_shown: set[str], fitting_shown: set[str], behaviour: dic
     """Was the user's reaction appropriate (Assignment 1: accept suitable
     personalisation, question misapplied memories)?
 
+    Only the reply's own memories count as a decision about it: accepting or flagging the
+    reply, or correcting a memory the reply used. Correcting some other memory says nothing
+    about whether they relied on this reply.
+
     no decision at all             -> "no decision" (finished without accepting, flagging
         or correcting anything). Kept apart, so doing nothing is never scored as a choice.
+    only another memory corrected  -> "unrelated correction" (no accept or flag, and no
+        correction of a memory in the reply). Kept apart too: it is neither trusting nor
+        questioning the reply.
     misapplied memory in the reply -> "appropriate" if they flagged the reply or
-        corrected that memory, otherwise "over-reliance" (e.g. accepted it).
+        corrected that memory, otherwise "over-reliance" (they accepted it).
     only fitting memories          -> "under-reliance" if they flagged the reply or
         corrected a fitting memory, otherwise "appropriate" (accepted it).
     no annotated memory            -> "n/a".
     """
     corrected = set(behaviour["corrected"])
-    if not (misapplied_shown or fitting_shown):
+    in_reply = misapplied_shown | fitting_shown
+    if not in_reply:
         return "n/a"
-    if not (behaviour.get("accepted") or behaviour.get("flagged") or corrected):
-        return "no decision"
+    relevant = corrected & in_reply
+    if not (behaviour.get("accepted") or behaviour.get("flagged") or relevant):
+        return "unrelated correction" if corrected else "no decision"
     if misapplied_shown:
-        questioned = behaviour["flagged"] or bool(corrected & misapplied_shown)
+        questioned = behaviour["flagged"] or bool(relevant & misapplied_shown)
         return "appropriate" if questioned else "over-reliance"
-    if fitting_shown:
-        questioned = behaviour["flagged"] or bool(corrected & fitting_shown)
-        return "under-reliance" if questioned else "appropriate"
-    return "n/a"
+    questioned = behaviour["flagged"] or bool(relevant & fitting_shown)
+    return "under-reliance" if questioned else "appropriate"
 
 
 def correction_actions(rows: list[dict]) -> list[str]:
