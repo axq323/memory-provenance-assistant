@@ -5,7 +5,7 @@
     "C3 Applied when it fits: every memory in should_use is listed as used.",
     "C4 Not over-applied: no memory in should_not_use is listed as used."
   ],
-  "_note": "A case passes only if all four criteria hold. Cases marked replay=true are the three scripted demo prompts; replay mode runs only those. Criteria were written before the system prompt was tuned (Lecture 09: write the criteria first, then score).",
+  "_note": "A case passes only if all four criteria hold. Cases marked replay=true are the scripted demo prompts (four since 23 Nov 2026, when the work email E04 became a replay scenario); replay mode runs only those. Criteria were written before the system prompt was tuned (Lecture 09: write the criteria first, then score).",
   "cases": [
     {
       "id": "E01",
@@ -44,6 +44,7 @@
     },
     {
       "id": "E04",
+      "replay": true,
       "prompt": "Write an email to my manager asking for Friday afternoon off.",
       "should_use": [
         "m2"
@@ -135,7 +136,7 @@
         "m1",
         "m2"
       ],
-      "_why": "Casual text not caught by the task-type keywords ('other'), so only the model's own judgement can avoid the formal tone."
+      "_why": "Casual text. Until 23 Nov 2026 the task-type keywords missed it ('other'), so only the model's own judgement could avoid the formal tone and a scoped correction for personal messages didn't cover it. It is now classified as a personal message ('flatmate'), which changes this case's result in the corrected condition from that date."
     },
     {
       "id": "E13",

@@ -36,7 +36,7 @@ def _button(at, label_start):
 
 def test_replay_banner_and_demo_buttons(app):
     assert any("Replay mode" in i.value for i in app.info)
-    assert len([b for b in app.button if (b.key or "").startswith("demo_")]) == 3
+    assert len([b for b in app.button if (b.key or "").startswith("demo_")]) == 4
 
 
 def test_demo_prompt_shows_reply_with_memory_chips(app):
@@ -225,7 +225,8 @@ def _evaluation(app):
 
 _SCENARIOS = {"Can you write a birthday message": "S3-birthday",
               "Can you suggest something I could make": "S1-dinner",
-              "I don't really understand how solar": "S2-explain"}
+              "I don't really understand how solar": "S2-explain",
+              "Write an email to my manager": "S4-work-email"}
 
 
 def _schedule(app, *ids):
@@ -804,8 +805,8 @@ def test_the_neutral_question_comes_before_the_fit_question_and_is_required(app,
 # ------------------------------------------------- a fixed set of tasks ---
 def test_tasks_are_served_in_the_planned_order(app, tmp_path):
     _evaluation(app)
-    assert app.session_state["eval_schedule"] == ["S1-dinner", "S3-birthday", "S2-explain"]
-    assert any("Task 1 of 3" in m.value for m in app.markdown)
+    assert app.session_state["eval_schedule"] == ["S1-dinner", "S3-birthday", "S4-work-email", "S2-explain"]
+    assert any("Task 1 of 4" in m.value for m in app.markdown)
     app.button(key="start_task").click().run()
     assert app.session_state["awaiting_prediction"] == DINNER
 
@@ -822,7 +823,7 @@ def test_own_prompts_cant_be_entered_in_evaluation_mode(app, tmp_path):
 def test_the_questionnaire_waits_until_every_scheduled_task_is_done(app, tmp_path):
     _finish_dinner(app)
     assert not any(b.key == "finish_session" for b in app.button)
-    assert any("Task 2 of 3" in m.value for m in app.markdown)
+    assert any("Task 2 of 4" in m.value for m in app.markdown)
     assert app.session_state["questionnaire"] is None
 
 
@@ -841,18 +842,20 @@ def test_each_task_starts_without_chat_history(app):
 
 def test_a_full_session_covers_every_scheduled_task(app, tmp_path):
     _finish_dinner(app)
-    for start, mid in (("Can you write a birthday message", "m2"), ("I don't really understand", "m1")):
+    for start, mid, react in (("Can you write a birthday message", "m2", "flag"),
+                              ("Write an email to my manager", "m2", "ok"),
+                              ("I don't really understand", "m1", "flag")):
         msg = _next_task(app, start, [mid])
-        app.button(key=f"flag_{msg['turn_id']}").click().run()
+        app.button(key=f"{react}_{msg['turn_id']}").click().run()
         app.button(key="task_done").click().run()
         _reason(app)
-        app.radio(key=f"fit_{mid}").set_value("no")
+        app.radio(key=f"fit_{mid}").set_value("no" if react == "flag" else "yes")
         next(b for b in app.button if b.label == "Next task →").click().run()
     assert any(b.key == "finish_session" for b in app.button)
     app.button(key="finish_session").click().run()
     _answer_all(app)
     next(b for b in app.button if b.label == "Submit").click().run()
-    assert "tasks=3;scheduled=3" in _log(tmp_path)
+    assert "tasks=4;scheduled=4" in _log(tmp_path)
 
 
 def test_the_schedule_can_be_set_from_the_environment(monkeypatch):
@@ -911,3 +914,34 @@ def test_the_forget_confirmation_says_what_is_and_isnt_removed(app):
     captions = " ".join(c.value for c in app.caption)
     assert "Replies it already shaped stay as they are" in captions
     assert "conversation it was saved from isn't deleted" in captions
+
+
+# ------------------------------------------------- a scoped correction keeps the memory where it fits ---
+WORK = "Write an email to my manager asking for Friday afternoon off."
+
+
+def test_after_a_scoped_birthday_correction_the_work_email_is_still_formal(app):
+    _evaluation(app)
+    _schedule(app, "S3-birthday", "S4-work-email")
+    birthday = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"nft_{birthday['turn_id']}:m2").click().run()
+    assert "Happy birthday, Sam" in _assistant(app)[-1]["reply"].answer
+    app.button(key="task_done").click().run()
+    _reason(app)
+    app.radio(key="fit_m2").set_value("no")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    work = _next_task(app, "Write an email to my manager", ["m2"])
+    assert {u["id"] for u in work["reply"].used} == {"m2"} and "Dear Ms Patel" in work["reply"].answer
+
+
+def test_after_forgetting_instead_the_work_email_loses_the_formal_tone(app):
+    _evaluation(app)
+    _schedule(app, "S3-birthday", "S4-work-email")
+    birthday = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"forget_{birthday['turn_id']}:m2").click().run()
+    app.button(key="task_done").click().run()
+    _reason(app)
+    app.radio(key="fit_m2").set_value("no")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    work = _next_task(app, "Write an email to my manager", [])
+    assert work["reply"].used == [] and work["reply"].answer.startswith("**Subject:** Friday afternoon?")

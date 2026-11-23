@@ -744,7 +744,7 @@ with st.sidebar:
 
 st.header("Your assistant")
 if MODE == "replay" and not ss.evaluation_mode:
-    st.info("**Replay mode:** replies are scripted (simulated) for the three demo prompts below. "
+    st.info("**Replay mode:** replies are scripted (simulated) for the demo prompts below. "
             "Which memories are sent still depends on your corrections, so the reply changes as it would live.")
     cols = st.columns(len(model.scenarios))
     for col, scenario in zip(cols, model.scenarios):

@@ -12,13 +12,19 @@ from __future__ import annotations
 
 import re
 
-# Order matters: the first matching rule wins.
+# Order matters: the first matching rule wins. Personal messages are checked twice: first for
+# occasions and close people (so "a birthday email to my boss's daughter" stays personal), then,
+# after work writing, for generic "text/message to my ..." (so "a message to my manager" is work).
 RULES: list[tuple[str, list[str]]] = [
     ("personal_message", ["birthday", "anniversary", "congratulations message", "thank-you text",
                           "thank you text", "message for my friend", "message for my best friend",
-                          "best friend", "to my grandmother", "to my mum", "to my mom", "to my dad"]),
+                          "best friend", "my friend", "flatmate", "roommate", "housemate",
+                          "my partner", "my sister", "my brother", "to my grandmother", "to my grandma",
+                          "to my grandad", "to my mum", "to my mom", "to my dad",
+                          "passed away", "condolence", "sympathy", "get well"]),
     ("work_writing", ["my manager", "my boss", "work email", "professional email", "cover letter",
                       "email to", "colleague", "client"]),
+    ("personal_message", ["text to my", "message to my", "quick text", "text message"]),
     ("feedback", ["feedback", "my essay", "my draft", "proofread", "what should i change"]),
     ("cooking", ["dinner", "lunch", "breakfast", "recipe", "cook", "meal", "menu"]),
     ("explain", ["explain", "how does", "how do", "what is", "what are", "why does",

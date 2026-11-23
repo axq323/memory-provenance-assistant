@@ -14,6 +14,15 @@ from mpa.task_types import classify, label
     ("Summarise the plot of Hamlet in a few lines.", "summarise"),
     ("Plan a weekend trip to Washington DC", "plan"),
     ("Hello there", "other"),
+    # personal messages that used to fall through to 'other' (live testing, E11/E12)
+    ("Write a quick text to my flatmate asking them to pick up milk on the way home.", "personal_message"),
+    ("Write a message for my friend Priya, whose grandfather just passed away.", "personal_message"),
+    ("Write a thank-you text to my grandmother for the birthday gift she sent.", "personal_message"),
+    ("Send a text message to my sister about Sunday", "personal_message"),
+    # ...without pulling work messages in
+    ("Write a message to my manager about the deadline.", "work_writing"),
+    ("Write an email to my manager asking for Friday afternoon off.", "work_writing"),
+    ("Write the opening paragraph of a cover letter for a data analyst job.", "work_writing"),
 ])
 def test_prompts_classify(text, expected):
     assert classify(text)[0] == expected

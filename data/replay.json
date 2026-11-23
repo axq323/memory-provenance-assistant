@@ -1,9 +1,10 @@
 {
   "_note": "SIMULATED model replies for replay mode. Each scenario lists the memories it could use (candidates) and one scripted reply per combination of candidates present in the context. The reply chosen depends on what context assembly actually sent, so user corrections (Not for this task, Forget) change the reply exactly as they would in live mode. Edited memory wording does not change scripted text. Each scenario also records ground truth for evaluation mode: which candidate memories fit the request and which would be misapplied (used by mpa/evaluation.py to score predictions, fit judgements and reliance).",
-  "_note_schedule": "evaluation_schedule: the scenarios evaluation mode serves, in this order, one task each. Every session gets the same tasks, so both memory-sources settings see the same mix of fitting and misapplied memories. MPA_EVAL_SCHEDULE (comma-separated ids) overrides it.",
+  "_note_schedule": "evaluation_schedule: the scenarios evaluation mode serves, in this order, one task each. Every session gets the same tasks, so both memory-sources settings see the same mix: two where the memories fit (dinner, work email) and two where one is misapplied (birthday, solar panels). The work email comes straight after the birthday message, so it shows whether a correction made there kept the formal tone where it belongs (scoped) or lost it (forgotten). MPA_EVAL_SCHEDULE (comma-separated ids) overrides it.",
   "evaluation_schedule": [
     "S1-dinner",
     "S3-birthday",
+    "S4-work-email",
     "S2-explain"
   ],
   "scenarios": [
@@ -109,6 +110,33 @@
         {
           "uses": [],
           "answer": "Happy birthday, Sam! 🎉\n\nAnother year older, and somehow still the only person who laughs at my jokes before I've even finished them. Thanks for every late-night chat, every terrible film we've sat through together, and for always turning up when it counts.\n\nHere's to a year of more adventures, more cake, and fewer of my cooking experiments. Have the best day, you deserve it!"
+        }
+      ]
+    },
+    {
+      "id": "S4-work-email",
+      "label": "Work email (memory fits)",
+      "prompt": "Write an email to my manager asking for Friday afternoon off.",
+      "candidates": [
+        "m2"
+      ],
+      "fits": [
+        "m2"
+      ],
+      "misapplied": [],
+      "variants": [
+        {
+          "uses": [
+            {
+              "id": "m2",
+              "how": "Wrote the email in a formal, professional tone"
+            }
+          ],
+          "answer": "**Subject:** Request for leave on Friday afternoon\n\nDear Ms Patel,\n\nI would like to request leave on Friday afternoon. My work for the week will be complete by Friday lunchtime, and I will make sure anything urgent is handed over before I leave.\n\nPlease let me know if this is convenient.\n\nKind regards,\n[Your name]"
+        },
+        {
+          "uses": [],
+          "answer": "**Subject:** Friday afternoon?\n\nHey!\n\nAny chance I could take Friday afternoon off? I'll have everything wrapped up by lunch 🙂\n\nCheers,\n[Your name]"
         }
       ]
     }

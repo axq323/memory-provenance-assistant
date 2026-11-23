@@ -122,3 +122,12 @@ def test_judge_model_comes_from_its_own_setting(monkeypatch):
     assert judge.model == "qwen2.5:7b" and judge.temperature == 0.0
     monkeypatch.delenv("JUDGE_MODEL")
     assert get_judge().model == "qwen2.5:7b"          # default judge
+
+
+def test_work_email_scenario_uses_the_formal_tone_and_survives_the_birthday_correction(store):
+    work = "Write an email to my manager asking for Friday afternoon off."
+    store.exclude_for_task("m2", "personal_message")
+    reply = _run(ReplayModel(), store, work)
+    assert {u["id"] for u in reply.used} == {"m2"} and "Dear Ms Patel" in reply.answer
+    store.forget("m2")
+    assert _run(ReplayModel(), store, work).used == []
