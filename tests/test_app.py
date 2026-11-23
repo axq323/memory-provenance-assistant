@@ -862,3 +862,52 @@ def test_the_schedule_can_be_set_from_the_environment(monkeypatch):
     monkeypatch.setenv("MPA_EVAL_SCHEDULE", "S9-nope")
     with pytest.raises(ValueError):
         evaluation_schedule()
+
+
+# ------------------------------------------------- past replies keep the wording they were sent with ---
+def _all_text(at):
+    return " ".join([m.value for m in at.markdown] + [c.value for c in at.caption]
+                    + [s.value for s in at.success] + [i.value for i in at.info])
+
+
+def test_editing_a_memory_does_not_rewrite_the_chip_under_an_earlier_reply(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    msg = _assistant(app)[0]
+    key = f"{msg['turn_id']}:m1"
+    app.text_area(key=f"edit_text_{key}").set_value("You prefer bullet points for essay feedback.")
+    app.button(key=f"edit_save_{key}").click().run()
+    chips = [m.value for m in app.markdown if m.value.startswith("🧠 **")]
+    assert "🧠 **You prefer short bullet-point summaries rather than long paragraphs.**" in chips
+    assert any("edited this memory since this reply" in c.value for c in app.caption)
+    assert any(m.value.startswith("You prefer bullet points for essay feedback.") for m in app.markdown)  # panel
+    assert next(m for m in msg["record"].memories_sent if m["id"] == "m1")["text"].startswith("You prefer short")
+
+
+def test_withheld_lines_use_the_wording_at_the_time(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    turn = _assistant(app)[0]["turn_id"]
+    app.button(key=f"nft_{turn}:m2").click().run()                       # redo: m2 withheld
+    app.text_area(key="edit_text_panel:m2").set_value("Formal tone for work emails only.")
+    app.button(key="edit_save_panel:m2").click().run()
+    assert any(c.value.startswith("⛔ Not sent: You want a formal, professional tone") for c in app.caption)
+
+
+def test_forget_blanks_the_wording_in_notices_withheld_lines_and_edit_boxes(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    turn = _assistant(app)[0]["turn_id"]
+    app.button(key=f"nft_{turn}:m2").click().run()                       # notice quotes m2
+    app.text_area(key=f"edit_text_{turn}:m2").set_value("unsaved draft about formal tone")
+    app.run()
+    app.button(key="forget_panel:m2").click().run()
+    assert not app.exception
+    text = _all_text(app)
+    assert "formal, professional tone" not in text and "unsaved draft" not in text
+    assert "that memory (since forgotten)" in text and "a memory you've since forgotten" in text
+    assert f"edit_text_{turn}:m2" not in app.session_state
+
+
+def test_the_forget_confirmation_says_what_is_and_isnt_removed(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    captions = " ".join(c.value for c in app.caption)
+    assert "Replies it already shaped stay as they are" in captions
+    assert "conversation it was saved from isn't deleted" in captions

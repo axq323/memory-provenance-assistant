@@ -9,7 +9,8 @@ def _mem(i, excluded=()):
 def test_excluded_memory_is_withheld_with_reason():
     rec = assemble("explain recursion", [_mem(1, ["explain"]), _mem(2)], "explain", "explain")
     assert rec.sent_ids == {"m2"}
-    assert rec.memories_withheld == [{"id": "m1", "reason": "you chose not to use it for explanations"}]
+    assert rec.memories_withheld == [{"id": "m1", "text": "memory 1",
+                                      "reason": "you chose not to use it for explanations"}]
     assert "[m1]" not in " ".join(m["content"] for m in rec.messages)
 
 
@@ -39,6 +40,12 @@ def test_budgets_cap_memories_and_history():
 def test_no_memory_block_when_none_selected():
     rec = assemble("x", [], "other", None)
     assert len(rec.messages) == 2
+
+
+def test_redact_also_covers_withheld_memories():
+    rec = assemble("explain", [_mem(1, ["explain"])], "explain", "explain")
+    rec.redact_memory("m1")
+    assert "memory 1" not in str(rec.to_dict())
 
 
 def test_redact_removes_memory_text_from_record():

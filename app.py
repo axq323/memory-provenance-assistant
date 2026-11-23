@@ -186,9 +186,7 @@ def not_for_task(msg_index: int, memory_id: str) -> None:
     store.exclude_for_task(memory_id, task)
     log("not_for_task", turn_id=msg["turn_id"], task=task, memory_id=memory_id)
     ss.messages.append({"role": "notice", "kind": "excluded", "memory_id": memory_id, "task": task,
-                        "undone": False, "turn_id": msg["turn_id"],
-                        "text": f"Got it. I won't use “{mem['text']}” for {label(task)}. "
-                                "Here's that reply again without it."})
+                        "undone": False, "turn_id": msg["turn_id"], "memory_text": mem["text"]})
     ss.pending_redo = msg_index   # rewritten in the page script, so a progress message can show
 
 
@@ -247,9 +245,14 @@ def forget(memory_id: str, turn_id: str = "") -> None:
             for r in m.get("influence") or []:
                 if r.id == memory_id:
                     r.text, r.evidence, r.reply_without = "[forgotten]", "[forgotten]", "[forgotten]"
+        elif m["role"] == "notice" and m.get("memory_id") == memory_id:
+            m["memory_text"] = None
+    for key in [k for k in ss if isinstance(k, str) and k.startswith("edit_text_") and k.endswith(memory_id)]:
+        del ss[key]                            # unsaved text in the Edit boxes
     ss.open_sources = {k for k in ss.open_sources if not k.endswith(memory_id)}
     log("memory_forgotten", turn_id=turn_id, memory_id=memory_id)
-    ss.flash.append("Forgotten. It's gone from memory and from the records of past replies.")
+    ss.flash.append("Forgotten. It's deleted, and its wording is blanked in this chat's records. "
+                    "Replies it already shaped are unchanged.")
 
 
 def set_verdict(msg_index: int, verdict: str) -> None:
@@ -389,6 +392,14 @@ def render_source(memory_id: str) -> None:
             st.caption(f"**{who}:**\n\n{t['text']}")
 
 
+# What Forget actually does (forget() below), so the confirmation promises no more than that.
+FORGET_EXPLAINED = ("Deletes this memory from storage and blanks its wording wherever this chat "
+                    "recorded it: what was sent with past replies, check results and notices. "
+                    "Replies it already shaped stay as they are, and the conversation it was saved "
+                    "from isn't deleted. This can't be undone.")
+FORGET_DURING_TASK = "During a task, its wording is kept until the task's last question, then cleared."
+
+
 def render_edit_forget(cols, mem: dict, key: str, turn_id: str = "") -> None:
     with cols[0].popover("Edit"):
         st.text_area("Memory wording", value=mem["text"], key=f"edit_text_{key}")
@@ -397,8 +408,7 @@ def render_edit_forget(cols, mem: dict, key: str, turn_id: str = "") -> None:
         st.button("Save", key=f"edit_save_{key}", on_click=save_edit,
                   args=(mem["id"], f"edit_text_{key}", turn_id))
     with cols[1].popover("Forget"):
-        st.caption("Deletes this memory and removes it from the records of past replies. "
-                   "This can't be undone.")
+        st.caption(FORGET_EXPLAINED + (" " + FORGET_DURING_TASK if ss.evaluation_mode else ""))
         st.button("Forget this memory", key=f"forget_{key}", type="primary",
                   on_click=forget, args=(mem["id"], turn_id))
 
@@ -428,11 +438,17 @@ def render_memory_chip(msg_index: int, msg: dict, used: dict, note: str | None =
     claimed and for memories that were sent but not claimed."""
     mem = store.get(used["id"])
     key = f"{msg['turn_id']}:{used['id']}"
+    # The wording shown is the wording that was sent with THIS reply (its record), so editing a
+    # memory later doesn't rewrite the history. The current wording lives in the memory panel.
+    sent = next((m["text"] for m in msg["record"].memories_sent if m["id"] == used["id"]), None)
     with st.container(border=True):
-        if mem is None:
+        if mem is None or sent == "[forgotten]":
             st.caption("A memory sent with this reply has since been forgotten.")
             return
-        st.markdown(f"🧠 **{mem['text']}**" + ("  _(edited by you)_" if mem.get("edited") else ""))
+        shown = sent if sent is not None else mem["text"]
+        st.markdown(f"🧠 **{shown}**")
+        if mem["text"] != shown:
+            st.caption("You've edited this memory since this reply. Its current wording is in the memory panel.")
         if used["how"]:
             st.caption(f"How it was applied: {used['how']}")
         if note:
@@ -578,8 +594,10 @@ def render_reply(msg_index: int, msg: dict) -> None:
                                    note=check_note(msg, m["id"]), interactive=active)
     # 3. memories that were not sent, e.g. because the user restricted them
     for w in rec.memories_withheld:
-        mem = store.get(w["id"])
-        st.caption(f"⛔ Not sent: {mem['text'] if mem else '[forgotten]'} ({w['reason']})")
+        text = w.get("text") or "[forgotten]"          # as it was when this reply was written
+        if text == "[forgotten]" or store.get(w["id"]) is None:
+            text = "a memory you've since forgotten"
+        st.caption(f"⛔ Not sent: {text} ({w['reason']})")
     verdict = msg.get("verdict")
     if verdict:
         st.caption("You marked this reply as working for you." if verdict == "accepted"
@@ -737,7 +755,8 @@ if MODE == "replay" and not ss.evaluation_mode:
 for i, msg in enumerate(ss.messages):
     if msg["role"] == "notice":
         with st.chat_message("assistant", avatar="🛠️"):
-            st.success(msg["text"])
+            what = f"“{msg['memory_text']}”" if msg.get("memory_text") else "that memory (since forgotten)"
+            st.success(f"Got it. I won't use {what} for {label(msg['task'])}. Here's that reply again without it.")
             notice_active = not ss.evaluation_mode or (
                 reacting() and trial_of(msg.get("turn_id", "")) == ss.eval_task["trial_id"])
             if msg["kind"] == "excluded" and not msg["undone"] and notice_active:

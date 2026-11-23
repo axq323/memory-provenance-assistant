@@ -84,7 +84,7 @@ class ContextRecord:
     trigger: str | None
     prompt_version: str
     memories_sent: list[dict] = field(default_factory=list)      # {id, text}
-    memories_withheld: list[dict] = field(default_factory=list)  # {id, reason}
+    memories_withheld: list[dict] = field(default_factory=list)  # {id, text, reason}
     history_turns_sent: int = 0
     messages: list[dict] = field(default_factory=list)           # what the model receives
 
@@ -94,7 +94,7 @@ class ContextRecord:
 
     def redact_memory(self, memory_id: str) -> None:
         """Forgetting removes derived copies too (Lecture 10)."""
-        for m in self.memories_sent:
+        for m in self.memories_sent + self.memories_withheld:
             if m["id"] == memory_id:
                 m["text"] = "[forgotten]"
                 m.pop("source", None)
@@ -128,13 +128,13 @@ def assemble(user_text: str, memories: list[dict], task: str, trigger: str | Non
     for m in memories:
         if task in m.get("excluded_tasks", []):
             record.memories_withheld.append(
-                {"id": m["id"], "reason": f"you chose not to use it for {label(task)}"})
+                {"id": m["id"], "text": m["text"], "reason": f"you chose not to use it for {label(task)}"})
         else:
             selected.append(m)
 
     # 3. budget (memories)
     for m in selected[MAX_MEMORIES:]:
-        record.memories_withheld.append({"id": m["id"], "reason": "memory budget reached"})
+        record.memories_withheld.append({"id": m["id"], "text": m["text"], "reason": "memory budget reached"})
     selected = selected[:MAX_MEMORIES]
     record.memories_sent = [{"id": m["id"], "text": m["text"],
                              **({"source": m["source_title"]} if m.get("source_title") else {})}
