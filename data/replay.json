@@ -1,27 +1,55 @@
 {
   "_note": "SIMULATED model replies for replay mode. Each scenario lists the memories it could use (candidates) and one scripted reply per combination of candidates present in the context. The reply chosen depends on what context assembly actually sent, so user corrections (Not for this task, Forget) change the reply exactly as they would in live mode. Edited memory wording does not change scripted text. Each scenario also records ground truth for evaluation mode: which candidate memories fit the request and which would be misapplied (used by mpa/evaluation.py to score predictions, fit judgements and reliance).",
+  "_note_schedule": "evaluation_schedule: the scenarios evaluation mode serves, in this order, one task each. Every session gets the same tasks, so both memory-sources settings see the same mix of fitting and misapplied memories. MPA_EVAL_SCHEDULE (comma-separated ids) overrides it.",
+  "evaluation_schedule": [
+    "S1-dinner",
+    "S3-birthday",
+    "S2-explain"
+  ],
   "scenarios": [
     {
       "id": "S1-dinner",
       "label": "Dinner tonight (memories fit)",
       "prompt": "Can you suggest something I could make for dinner tonight?",
-      "candidates": ["m3", "m4"],
-      "fits": ["m3", "m4"],
+      "candidates": [
+        "m3",
+        "m4"
+      ],
+      "fits": [
+        "m3",
+        "m4"
+      ],
       "misapplied": [],
       "variants": [
         {
           "uses": [
-            {"id": "m3", "how": "Only suggested a vegetarian dish"},
-            {"id": "m4", "how": "Picked a recipe that takes under 30 minutes"}
+            {
+              "id": "m3",
+              "how": "Only suggested a vegetarian dish"
+            },
+            {
+              "id": "m4",
+              "how": "Picked a recipe that takes under 30 minutes"
+            }
           ],
           "answer": "Here's a vegetarian dinner you can make in about 25 minutes.\n\n**Chickpea and spinach curry**\n- Fry a chopped onion, two garlic cloves and a thumb of ginger in oil (5 min)\n- Add 2 tbsp curry paste, a tin of chickpeas and a tin of chopped tomatoes, then simmer for 10 min\n- Stir in two handfuls of spinach and a splash of coconut milk until the spinach wilts\n- Serve with rice or warm naan\n\nIt keeps well, so leftovers make tomorrow's lunch."
         },
         {
-          "uses": [{"id": "m3", "how": "Only suggested a vegetarian dish"}],
+          "uses": [
+            {
+              "id": "m3",
+              "how": "Only suggested a vegetarian dish"
+            }
+          ],
           "answer": "How about a **roasted vegetable lasagne**? It takes about 1 hour 15 minutes, most of it in the oven.\n\n- Roast courgette, aubergine, peppers and red onion at 200 °C for 25 min\n- Make a quick tomato sauce with garlic, tinned tomatoes and basil\n- Layer sauce, roasted vegetables, lasagne sheets and ricotta, three times over\n- Top with mozzarella and bake for 40 min until golden\n\nLet it rest for 10 minutes before cutting."
         },
         {
-          "uses": [{"id": "m4", "how": "Picked a recipe that takes under 30 minutes"}],
+          "uses": [
+            {
+              "id": "m4",
+              "how": "Picked a recipe that takes under 30 minutes"
+            }
+          ],
           "answer": "Here's a dinner you can make in about 20 minutes.\n\n**Garlic butter salmon with green beans**\n- Season two salmon fillets and fry skin-side down for 4 min\n- Flip, add butter and crushed garlic, and baste for 3 min\n- Steam green beans alongside for 5 min\n- Finish with lemon juice and serve with microwave rice"
         },
         {
@@ -34,12 +62,21 @@
       "id": "S2-explain",
       "label": "Explain solar panels (memory misapplied)",
       "prompt": "I don't really understand how solar panels work. Can you explain it properly, step by step?",
-      "candidates": ["m1"],
+      "candidates": [
+        "m1"
+      ],
       "fits": [],
-      "misapplied": ["m1"],
+      "misapplied": [
+        "m1"
+      ],
       "variants": [
         {
-          "uses": [{"id": "m1", "how": "Kept the explanation to short bullet points"}],
+          "uses": [
+            {
+              "id": "m1",
+              "how": "Kept the explanation to short bullet points"
+            }
+          ],
           "answer": "- Sunlight hits silicon cells in the panel\n- The light frees electrons, creating a current\n- An inverter converts it for use in your home"
         },
         {
@@ -52,12 +89,21 @@
       "id": "S3-birthday",
       "label": "Birthday message (memory misapplied)",
       "prompt": "Can you write a birthday message for my best friend Sam? Something warm and a bit funny.",
-      "candidates": ["m2"],
+      "candidates": [
+        "m2"
+      ],
       "fits": [],
-      "misapplied": ["m2"],
+      "misapplied": [
+        "m2"
+      ],
       "variants": [
         {
-          "uses": [{"id": "m2", "how": "Wrote the message in a formal, professional tone"}],
+          "uses": [
+            {
+              "id": "m2",
+              "how": "Wrote the message in a formal, professional tone"
+            }
+          ],
           "answer": "Dear Sam,\n\nI would like to extend my warmest wishes on the occasion of your birthday. I trust the coming year will bring you continued success in your personal and professional endeavours, and I look forward to our continued association.\n\nKind regards,\n[Your name]"
         },
         {

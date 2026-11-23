@@ -22,7 +22,8 @@ from mpa.interaction_log import log_event, read_log  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
 from mpa.evaluation import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, clean_comment,  # noqa: E402
-                            correction_actions, correction_outcome, final_state, ground_truth,
+                            correction_actions, correction_outcome, evaluation_schedule, final_state,
+                            scenario, truth_for,
                             reliance, score_fit, score_prediction, summarise_task)
 from mpa.task_types import LABELS, classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
@@ -86,6 +87,10 @@ ss.setdefault("eval_task", None)
 ss.setdefault("awaiting_reason", False)  # after "I'm done": "What made you choose that?"
 ss.setdefault("awaiting_fit", False)
 ss.setdefault("trial_count", 0)        # evaluation tasks started in this session
+# Evaluation mode serves a fixed list of scenarios (data/replay.json), one task each, in order.
+ss.setdefault("eval_schedule", evaluation_schedule())
+ss.setdefault("trials_done", [])       # scenario ids of the tasks finished so far
+ss.setdefault("awaiting_scenario", None)
 ss.setdefault("questionnaire", None)   # None, "open" or "done" (end of an evaluation session)
 # Memory-sources setting: A = memories shown with where they came from (the design), B = memories
 # only, so the two can be compared. Logged as "condition". Fix it with ?condition=B in the URL.
@@ -278,6 +283,8 @@ def clear_session_state() -> None:
     ss.awaiting_reason = False
     ss.awaiting_fit = False
     ss.questionnaire = None
+    ss.awaiting_scenario = None
+    ss.trials_done = []
 
 
 def new_session() -> None:
@@ -291,8 +298,24 @@ def new_session() -> None:
     log("session_started", detail=f"condition={ss.condition}")
 
 
+def next_scenario() -> str | None:
+    """The next scheduled task that hasn't been finished, or None when all are done."""
+    return next((sid for sid in ss.eval_schedule if sid not in ss.trials_done), None)
+
+
+def start_task(scenario_id: str) -> None:
+    """Evaluation mode: put the scheduled prompt in the chat and ask for a prediction."""
+    if ss.eval_task is not None or ss.awaiting_prediction or scenario_id != next_scenario():
+        return
+    prompt = scenario(scenario_id)["prompt"]
+    ss.messages.append({"role": "user", "text": prompt})
+    ss.awaiting_prediction = prompt
+    ss.awaiting_scenario = scenario_id
+
+
 def open_questionnaire() -> None:
-    ss.questionnaire = "open"
+    if next_scenario() is None:            # only after every scheduled task
+        ss.questionnaire = "open"
 
 
 def _now() -> str:
@@ -313,7 +336,7 @@ def finish_task() -> None:
     task = ss.eval_task
     msg = ss.messages[task["msg_index"]]
     used = set(task["stimulus"])
-    truth = ground_truth(msg["user_text"])
+    truth = truth_for(task["scenario"])
     rows = _task_rows(task["trial_id"])
     behaviour = summarise_task(rows, task["started"], _now())
     misapplied = used & set(truth["misapplied"]) if truth else set()
@@ -335,6 +358,7 @@ def finish_task() -> None:
                f"actions={','.join(actions) or 'none'};"
                f"final={','.join(f'{m}:{v}' for m, v in sorted(states.items())) or 'none'};"
                f"correction={correction}")
+    ss.trials_done.append(task["scenario"])
     if fit_questions():
         ss.awaiting_reason = True           # neutral question first, then the fit question
     else:                                   # no memory was used, so there is nothing to judge
@@ -685,9 +709,8 @@ def render_log_download() -> None:
 
 # ---------------------------------------------------------------- page ---
 SHOW_SOURCES = ss.condition == "A"
-# In evaluation mode a new prompt waits until the current task (prediction -> reply -> fit) is finished.
-LOCKED = bool(ss.awaiting_prediction) or (ss.evaluation_mode and (ss.eval_task is not None
-                                                             or ss.questionnaire is not None))
+# In evaluation mode the tasks are given by the schedule, so the user can't type their own prompts.
+LOCKED = bool(ss.awaiting_prediction) or ss.evaluation_mode
 for note in ss.flash:
     st.toast(note)
 ss.flash = []
@@ -702,7 +725,7 @@ with st.sidebar:
         render_controls()
 
 st.header("Your assistant")
-if MODE == "replay":
+if MODE == "replay" and not ss.evaluation_mode:
     st.info("**Replay mode:** replies are scripted (simulated) for the three demo prompts below. "
             "Which memories are sent still depends on your corrections, so the reply changes as it would live.")
     cols = st.columns(len(model.scenarios))
@@ -748,14 +771,16 @@ def render_prediction_step() -> None:
     if predicted and ss.get("pred_none"):
         st.warning("You ticked “None of them” and a memory. Please choose one or the other.")
         return
-    prompt = ss.awaiting_prediction
-    with st.spinner("Thinking…"):
-        ss.trial_count += 1                     # per session; clearing the chat doesn't reuse an id
+    prompt, scenario_id = ss.awaiting_prediction, ss.awaiting_scenario
+    ss.trial_count += 1                         # per session; clearing the chat doesn't reuse an id
     trial_id = f"trial{ss.trial_count}"
-    reply_msg = respond(prompt, history_before(len(ss.messages) - 1), trial_id=trial_id)
+    with st.spinner("Thinking…"):
+        # each task starts without chat history, so every session gets the same reply to it
+        reply_msg = respond(prompt, [], trial_id=trial_id)
     used = {u["id"] for u in reply_msg["reply"].used}
     score = score_prediction(predicted, used)
-    truth = ground_truth(prompt)
+    truth = truth_for(scenario_id)
+    reply_msg["scenario"] = scenario_id
     reply_msg["prediction"] = {"predicted": sorted(predicted), **score}
     ss.messages.append(reply_msg)
     log("prediction_made", turn_id=reply_msg["turn_id"], task=reply_msg["task"],
@@ -765,13 +790,14 @@ def render_prediction_step() -> None:
     for key in [f"pred_{m['id']}" for m in memories] + ["pred_none"]:
         ss.pop(key, None)
     ss.awaiting_prediction = None
+    ss.awaiting_scenario = None
     # The memories the reply used, as they were at the start of the task (for the fit question and
     # for scoring where each one ended up). Held only while the task is open.
     sent = {m["id"]: m["text"] for m in reply_msg["record"].memories_sent}
     stimulus = {mid: {"text": sent[mid], "excluded_tasks": list((store.get(mid) or {}).get("excluded_tasks", []))}
                 for mid in sorted(used) if mid in sent}
     ss.eval_task = {"msg_index": len(ss.messages) - 1, "turn_id": reply_msg["turn_id"],
-                    "trial_id": trial_id, "started": _now(), "stimulus": stimulus}
+                    "trial_id": trial_id, "scenario": scenario_id, "started": _now(), "stimulus": stimulus}
     st.rerun()
 
 
@@ -817,7 +843,7 @@ def render_task_controls() -> None:
     if any(a is None for a in answers.values()):
         st.warning("Please answer every question.")
         return
-    truth = ground_truth(msg["user_text"])
+    truth = truth_for(task["scenario"])
     msg["fit"] = {}
     for mid, answer in answers.items():
         score = score_fit(answer, mid, truth)
@@ -846,10 +872,19 @@ def render_session_end() -> None:
                 render_log_download()
         return
     if ss.questionnaire is None:
+        upcoming = next_scenario()
+        total = len(ss.eval_schedule)
         with st.chat_message("assistant", avatar="🔮"):
-            st.caption(f"Tasks finished: {tasks_finished()}. Ask the next question, or finish when "
-                       "you've done all the tasks.")
-            st.button("Finish the session →", key="finish_session", on_click=open_questionnaire)
+            if upcoming is not None:
+                n = len(ss.trials_done) + 1
+                st.markdown(f"**Task {n} of {total}.** Imagine you're asking your assistant this:")
+                st.markdown(f"> {scenario(upcoming)['prompt']}")
+                st.button(f"Start task {n} of {total} →", key="start_task", type="primary",
+                          on_click=start_task, args=(upcoming,))
+            else:
+                st.caption(f"Tasks finished: {tasks_finished()} of {total}. That's all the tasks.")
+                st.button("Finish the session →", key="finish_session", on_click=open_questionnaire,
+                          type="primary")
         return
     with st.chat_message("assistant", avatar="🔮"):
         with st.form("questionnaire_form"):
@@ -872,7 +907,7 @@ def render_session_end() -> None:
     comment = clean_comment(ss.get("q_comment", ""))
     if comment:
         log("questionnaire_answered", detail=f"item=comment;text={comment}")
-    log("session_finished", detail=f"tasks={tasks_finished()}")
+    log("session_finished", detail=f"tasks={tasks_finished()};scheduled={len(ss.eval_schedule)}")
     ss.questionnaire = "done"
     st.rerun()
 
@@ -888,15 +923,13 @@ elif ss.evaluation_mode and ss.eval_task is not None:
 elif ss.evaluation_mode:
     render_session_end()
 
-typed = st.chat_input("Ask your assistant anything…", disabled=LOCKED)
+typed = st.chat_input("Ask your assistant anything…" if not ss.evaluation_mode
+                      else "In evaluation mode, start each task with the button above.", disabled=LOCKED)
 prompt = typed or ss.pending_prompt
 ss.pending_prompt = None
 if prompt and not LOCKED:
     history = history_before(len(ss.messages))
     ss.messages.append({"role": "user", "text": prompt})
-    if ss.evaluation_mode:
-        ss.awaiting_prediction = prompt            # reply is generated after the prediction
-    else:
-        with st.spinner("Thinking…"):
-            ss.messages.append(respond(prompt, history))
+    with st.spinner("Thinking…"):
+        ss.messages.append(respond(prompt, history))
     st.rerun()

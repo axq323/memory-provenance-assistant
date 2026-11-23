@@ -28,18 +28,48 @@ live mode.
 
 from __future__ import annotations
 
-from .llm import ReplayModel
+import json
+import os
+
+from .llm import REPLAY_PATH, ReplayModel
 
 _scenarios = ReplayModel()
+
+
+def _truth(s: dict) -> dict:
+    return {"scenario": s["id"], "fits": list(s.get("fits", [])),
+            "misapplied": list(s.get("misapplied", []))}
 
 
 def ground_truth(user_text: str) -> dict | None:
     """{"scenario", "fits", "misapplied"} for a demo prompt, or None if unknown."""
     s = _scenarios.match(user_text)
-    if s is None:
-        return None
-    return {"scenario": s["id"], "fits": list(s.get("fits", [])),
-            "misapplied": list(s.get("misapplied", []))}
+    return None if s is None else _truth(s)
+
+
+def scenario(scenario_id: str) -> dict | None:
+    return next((s for s in _scenarios.scenarios if s["id"] == scenario_id), None)
+
+
+def truth_for(scenario_id: str | None) -> dict | None:
+    """Ground truth for a scheduled task, looked up by its scenario id (not by prompt text)."""
+    s = scenario(scenario_id) if scenario_id else None
+    return None if s is None else _truth(s)
+
+
+def evaluation_schedule() -> list[str]:
+    """The scenario ids evaluation mode serves, in order (data/replay.json, evaluation_schedule).
+    MPA_EVAL_SCHEDULE="S3-birthday,S1-dinner" overrides it; unknown ids are an error."""
+    override = os.getenv("MPA_EVAL_SCHEDULE", "").strip()
+    if override:
+        ids = [i.strip() for i in override.split(",") if i.strip()]
+    else:
+        data = json.loads(REPLAY_PATH.read_text(encoding="utf-8"))
+        ids = data.get("evaluation_schedule") or [s["id"] for s in data["scenarios"]]
+    unknown = [i for i in ids if scenario(i) is None]
+    if unknown:
+        raise ValueError(f"Unknown scenario ids in the evaluation schedule: {unknown}")
+    return ids
 
 
 def score_prediction(predicted: set[str], used: set[str]) -> dict:

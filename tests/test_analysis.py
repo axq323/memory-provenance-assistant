@@ -152,7 +152,9 @@ def test_two_sessions_through_the_app_are_summarised(tmp_path, monkeypatch):
     def session(condition, react):
         app.radio(key="condition").set_value(condition).run()
         app.button(key="new_session").click().run()
-        next(b for b in app.button if b.label.startswith("Can you write a birthday message")).click().run()
+        app.session_state["eval_schedule"] = ["S3-birthday"]
+        app.run()
+        app.button(key="start_task").click().run()
         app.checkbox(key="pred_m2").check()
         next(b for b in app.button if b.label == "Show me the reply").click().run()
         msg = [m for m in app.session_state["messages"] if m["role"] == "assistant"][0]

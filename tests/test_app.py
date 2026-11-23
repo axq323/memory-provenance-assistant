@@ -223,9 +223,28 @@ def _evaluation(app):
     return app
 
 
+_SCENARIOS = {"Can you write a birthday message": "S3-birthday",
+              "Can you suggest something I could make": "S1-dinner",
+              "I don't really understand how solar": "S2-explain"}
+
+
+def _schedule(app, *ids):
+    app.session_state["eval_schedule"] = list(ids)
+    app.run()
+
+
+def _begin(app, prompt_start):
+    """Start the scheduled task for this prompt (moved to the front of the tasks left)."""
+    sid = next(v for k, v in _SCENARIOS.items() if k.startswith(prompt_start) or prompt_start.startswith(k))
+    done = list(app.session_state["trials_done"])
+    rest = [x for x in app.session_state["eval_schedule"] if x not in done and x != sid]
+    _schedule(app, *(done + [sid] + rest))
+    app.button(key="start_task").click().run()
+
+
 def test_evaluation_mode_asks_for_a_prediction_before_the_reply(app):
     _evaluation(app)
-    _button(app, "Can you write a birthday message").click().run()
+    _begin(app, "Can you write a birthday message")
     assert not app.exception
     assert any("which of your memories do you expect" in m.value for m in app.markdown)
     assert not any(m["role"] == "assistant" for m in app.session_state["messages"])   # no reply yet
@@ -233,7 +252,7 @@ def test_evaluation_mode_asks_for_a_prediction_before_the_reply(app):
 
 def test_prediction_is_logged_against_what_was_used(app, tmp_path):
     _evaluation(app)
-    _button(app, "Can you write a birthday message").click().run()
+    _begin(app, "Can you write a birthday message")
     app.checkbox(key="pred_m2").check()
     _submit_prediction(app)
     assert not app.exception
@@ -246,7 +265,7 @@ def test_prediction_is_logged_against_what_was_used(app, tmp_path):
 
 def test_none_of_them_and_empty_prediction(app, tmp_path):
     _evaluation(app)
-    _button(app, "Can you suggest something I could make").click().run()
+    _begin(app, "Can you suggest something I could make")
     _submit_prediction(app)
     assert any("Tick at least one" in w.value for w in app.warning)               # nothing ticked
     app.checkbox(key="pred_none").check()
@@ -258,7 +277,7 @@ def test_none_of_them_and_empty_prediction(app, tmp_path):
 
 def test_evaluation_mode_hides_the_influence_check(app):
     _evaluation(app)
-    _button(app, "Can you suggest something I could make").click().run()
+    _begin(app, "Can you suggest something I could make")
     app.checkbox(key="pred_m3").check()
     _submit_prediction(app)
     assert not any((b.key or "").startswith("infl_") for b in app.button)
@@ -274,8 +293,8 @@ def test_evaluation_mode_from_url(tmp_path, monkeypatch):
 
 
 def test_clear_chat_cancels_a_pending_prediction(app):
-    app.toggle(key="evaluation_mode").set_value(True).run()
-    app.chat_input[0].set_value(DINNER).run()
+    _evaluation(app)
+    _begin(app, "Can you suggest something I could make")
     assert app.session_state["awaiting_prediction"] == DINNER
     app.button(key="clear_chat").click().run()
     assert not app.exception
@@ -373,7 +392,7 @@ BIRTHDAY = "Can you write a birthday message for my best friend Sam? Something w
 
 def _start_task(app, prompt_start, predict):
     _evaluation(app)
-    _button(app, prompt_start).click().run()
+    _begin(app, prompt_start)
     for mid in predict:
         app.checkbox(key=f"pred_{mid}").check()
     if not predict:
@@ -390,7 +409,7 @@ def _log(tmp_path):
 def test_new_prompts_wait_until_the_task_is_finished(app):
     _start_task(app, "Can you write a birthday message", ["m2"])
     assert app.chat_input[0].proto.disabled
-    assert all(b.disabled for b in app.button if (b.key or "").startswith("demo_"))
+    assert not any((b.key or "").startswith("demo_") or b.key == "start_task" for b in app.button)
     assert any(b.key == "task_done" for b in app.button)
     assert not any("Did it suit your request" in r.label for r in app.radio)   # not asked yet
 
@@ -407,7 +426,7 @@ def test_flagging_a_misapplied_memory_is_appropriate_and_fit_is_scored(app, tmp_
     assert not app.exception
     assert "answer=no;truth=misapplied;correct=True;scenario=S3-birthday" in _log(tmp_path)
     assert app.session_state["eval_task"] is None
-    assert not app.chat_input[0].proto.disabled                              # next task can start
+    assert any(b.key == "start_task" for b in app.button)                    # next task can start
 
 
 def test_accepting_a_misapplied_memory_is_over_reliance(app, tmp_path):
@@ -470,7 +489,7 @@ def test_clear_chat_ends_an_open_task(app):
     _start_task(app, "Can you write a birthday message", ["m2"])
     app.button(key="clear_chat").click().run()
     assert app.session_state["eval_task"] is None and not app.session_state["awaiting_fit"]
-    assert not app.chat_input[0].proto.disabled
+    assert any(b.key == "start_task" for b in app.button)
 
 
 def test_outside_evaluation_mode_nothing_is_locked(app):
@@ -487,6 +506,8 @@ def _answer_all(app, score=5):
 
 
 def _finish_one_task(app):
+    _evaluation(app)
+    _schedule(app, "S3-birthday")
     msg = _start_task(app, "Can you write a birthday message", ["m2"])
     app.button(key=f"flag_{msg['turn_id']}").click().run()
     app.button(key="task_done").click().run()
@@ -496,6 +517,8 @@ def _finish_one_task(app):
 
 
 def test_finish_session_appears_only_between_tasks(app):
+    _evaluation(app)
+    _schedule(app, "S3-birthday")
     msg = _start_task(app, "Can you write a birthday message", ["m2"])
     assert not any(b.key == "finish_session" for b in app.button)          # task still open
     app.button(key="task_done").click().run()
@@ -525,6 +548,7 @@ def test_questionnaire_is_logged_separately_and_ends_the_session(app, tmp_path):
 
 def test_every_statement_must_be_answered(app, tmp_path):
     _evaluation(app)
+    _schedule(app)                                                          # no tasks
     app.button(key="finish_session").click().run()
     app.radio(key="q_trust").set_value(4)
     next(b for b in app.button if b.label == "Submit").click().run()
@@ -637,7 +661,7 @@ def _finish_dinner(app):
 
 
 def _next_task(app, prompt_start, predict):
-    _button(app, prompt_start).click().run()
+    _begin(app, prompt_start)
     for mid in predict:
         app.checkbox(key=f"pred_{mid}").check()
     if not predict:
@@ -775,3 +799,66 @@ def test_the_neutral_question_comes_before_the_fit_question_and_is_required(app,
     assert any((r.key or "") == "fit_m2" for r in app.radio)
     assert "reason_given" in _log(tmp_path) and "text=It sounded like a letter to my bank, not right" in _log(tmp_path)
     assert not any(b.key == f"flag_{_assistant(app)[0]['turn_id']}" for b in app.button)   # reacting is over
+
+
+# ------------------------------------------------- a fixed set of tasks ---
+def test_tasks_are_served_in_the_planned_order(app, tmp_path):
+    _evaluation(app)
+    assert app.session_state["eval_schedule"] == ["S1-dinner", "S3-birthday", "S2-explain"]
+    assert any("Task 1 of 3" in m.value for m in app.markdown)
+    app.button(key="start_task").click().run()
+    assert app.session_state["awaiting_prediction"] == DINNER
+
+
+def test_own_prompts_cant_be_entered_in_evaluation_mode(app, tmp_path):
+    _evaluation(app)
+    assert app.chat_input[0].proto.disabled
+    assert not any((b.key or "").startswith("demo_") for b in app.button)
+    app.session_state["pending_prompt"] = "What is 17 times 23?"           # e.g. a demo click left queued
+    app.run()
+    assert app.session_state["messages"] == [] and app.session_state["pending_prompt"] is None
+
+
+def test_the_questionnaire_waits_until_every_scheduled_task_is_done(app, tmp_path):
+    _finish_dinner(app)
+    assert not any(b.key == "finish_session" for b in app.button)
+    assert any("Task 2 of 3" in m.value for m in app.markdown)
+    assert app.session_state["questionnaire"] is None
+
+
+def test_ground_truth_comes_from_the_scheduled_scenario(app, tmp_path):
+    _finish_dinner(app)
+    rows = _rows(app, tmp_path)
+    assert all("scenario=S1-dinner" in r["detail"] for r in rows
+               if r["event"] in ("prediction_made", "task_finished", "fit_judged"))
+
+
+def test_each_task_starts_without_chat_history(app):
+    _finish_dinner(app)
+    birthday = _next_task(app, "Can you write a birthday message", ["m2"])
+    assert birthday["history"] == [] and birthday["record"].history_turns_sent == 0
+
+
+def test_a_full_session_covers_every_scheduled_task(app, tmp_path):
+    _finish_dinner(app)
+    for start, mid in (("Can you write a birthday message", "m2"), ("I don't really understand", "m1")):
+        msg = _next_task(app, start, [mid])
+        app.button(key=f"flag_{msg['turn_id']}").click().run()
+        app.button(key="task_done").click().run()
+        _reason(app)
+        app.radio(key=f"fit_{mid}").set_value("no")
+        next(b for b in app.button if b.label == "Next task →").click().run()
+    assert any(b.key == "finish_session" for b in app.button)
+    app.button(key="finish_session").click().run()
+    _answer_all(app)
+    next(b for b in app.button if b.label == "Submit").click().run()
+    assert "tasks=3;scheduled=3" in _log(tmp_path)
+
+
+def test_the_schedule_can_be_set_from_the_environment(monkeypatch):
+    from mpa.evaluation import evaluation_schedule
+    monkeypatch.setenv("MPA_EVAL_SCHEDULE", "S3-birthday, S1-dinner")
+    assert evaluation_schedule() == ["S3-birthday", "S1-dinner"]
+    monkeypatch.setenv("MPA_EVAL_SCHEDULE", "S9-nope")
+    with pytest.raises(ValueError):
+        evaluation_schedule()
