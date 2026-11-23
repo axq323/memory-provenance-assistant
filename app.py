@@ -51,11 +51,16 @@ MODE = "replay" if isinstance(model, ReplayModel) else "live"
 
 # A locked evaluation session (?evaluate=1 in the URL) is what a participant sees: evaluation mode
 # is on, the memory-sources setting comes from the URL (?condition=B) and can't be changed, and
-# the developer, reset and download controls are hidden.
-SESSION_LOCKED = st.query_params.get("evaluate", "0") == "1"
-URL_CONDITION = "B" if st.query_params.get("condition", "A").upper() == "B" else "A"
-
+# the developer, reset and download controls are hidden. Both are read ONCE, when the session
+# starts, and pinned: changing the URL later in the same session is ignored (and logged), so a
+# session can never switch setting part-way through.
 ss = st.session_state
+_url_locked = st.query_params.get("evaluate", "0") == "1"
+_url_condition = "B" if st.query_params.get("condition", "A").upper() == "B" else "A"
+ss.setdefault("pinned", {"locked": _url_locked, "condition": _url_condition})
+SESSION_LOCKED = ss.pinned["locked"]
+URL_CONDITION = ss.pinned["condition"]
+
 ss.setdefault("messages", [])          # user / assistant turns
 ss.setdefault("session_id", uuid.uuid4().hex[:6])
 
@@ -79,7 +84,7 @@ ss.setdefault("influence_check", True)  # show the counterfactual check (hidden 
 # Evaluation mode turns each request into a guided task (predict -> reply -> react -> fit question,
 # then a short questionnaire), so the design can be tested as Assignment 1 proposes. It hides the
 # influence check. Switch it on in the sidebar or with ?evaluate=1 in the URL.
-ss.setdefault("evaluation_mode", st.query_params.get("evaluate", "0") == "1")
+ss.setdefault("evaluation_mode", SESSION_LOCKED)
 ss.setdefault("awaiting_prediction", None)  # prompt waiting for the user's prediction
 # A task runs from the prediction to the fit question: {"msg_index", "turn_id", "started"}.
 # While it is open the user reacts freely; new prompts are locked until it is finished.
@@ -128,6 +133,14 @@ def log(event: str, trial_id: str | None = None, **kw) -> None:
             trial_id = ""
     log_event(event, session_id=ss.session_id, condition=ss.condition, mode=MODE,
               path=log_path(), trial_id=trial_id, **kw)
+
+
+# A locked session keeps its pinned setting whatever the URL says now; record each attempt once.
+if SESSION_LOCKED and (_url_condition, _url_locked) != (URL_CONDITION, True):
+    _attempt = f"url_condition={_url_condition};url_evaluate={int(_url_locked)};kept={URL_CONDITION}"
+    if ss.get("ignored_url_change") != _attempt:
+        ss.ignored_url_change = _attempt
+        log("condition_change_ignored", detail=_attempt)
 
 
 # -------------------------------------------------------------- actions ---
@@ -310,6 +323,13 @@ def new_session() -> None:
     shown = "shown" if ss.condition == "A" else "hidden"
     ss.flash = [f"New session {ss.session_id}: memory sources {shown}."]
     log("session_started", detail=f"condition={ss.condition}")
+
+
+def condition_changed() -> None:
+    """Developer controls: in evaluation mode, a different memory-sources setting starts a new
+    session, so no session's tasks are logged under two settings."""
+    if ss.evaluation_mode:
+        new_session()
 
 
 def next_scenario() -> str | None:
@@ -715,7 +735,7 @@ def render_memory_panel() -> None:
 def render_controls() -> None:
     """Developer controls. Hidden in a locked evaluation session (?evaluate=1)."""
     with st.expander("Demo and evaluation controls"):
-        st.radio("Memory sources", ["A", "B"], key="condition",
+        st.radio("Memory sources", ["A", "B"], key="condition", on_change=condition_changed,
                  format_func=lambda c: {"A": "Shown: memories + where they came from",
                                         "B": "Hidden: memories only (for comparison)"}[c])
         st.toggle("Developer view", key="developer_view",

@@ -567,13 +567,14 @@ def test_every_statement_must_be_answered(app, tmp_path):
 def test_new_session_gets_a_new_session_and_fresh_state(app, tmp_path):
     _finish_one_task(app)
     old = app.session_state["session_id"]
-    app.radio(key="condition").set_value("B").run()
+    app.radio(key="condition").set_value("B").run()           # in evaluation mode this starts one too
     app.button(key="new_session").click().run()
     assert not app.exception
     assert app.session_state["session_id"] != old
     assert app.session_state["messages"] == [] and app.session_state["questionnaire"] is None
     rows = [r for r in _log(tmp_path).splitlines() if "session_started" in r]
-    assert len(rows) == 1 and app.session_state["session_id"] in rows[0] and "condition=B" in rows[0]
+    assert rows and all("condition=B" in r for r in rows)            # logs sort by session id, not time
+    assert any(app.session_state["session_id"] in r for r in rows)
 
 
 def test_no_questionnaire_outside_evaluation_mode(app):
@@ -1029,3 +1030,53 @@ def test_source_titles_appear_only_when_the_source_is_opened(app):
     assert not any(t in c.value for c in app.caption for t in titles)    # setting A, nothing opened
     app.button(key="src_panel:m2").click().run()
     assert any("Work email: asking my manager" in c.value for c in app.caption)
+
+
+# ------------------------------------------------- stage 10, part 2: the setting is pinned ---
+def test_changing_the_url_condition_mid_session_is_ignored_and_logged(tmp_path, monkeypatch):
+    at = _locked(tmp_path, monkeypatch, "B")
+    at.query_params["condition"] = "A"
+    at.run()
+    at.run()
+    assert at.session_state["condition"] == "B" and not any((b.key or "").startswith("src_") for b in at.button)
+    log = _all_logs(tmp_path)
+    assert log.count("condition_change_ignored") == 1 and "url_condition=A;url_evaluate=1;kept=B" in log
+
+
+def test_removing_evaluate_from_the_url_does_not_unlock_the_session(tmp_path, monkeypatch):
+    at = _locked(tmp_path, monkeypatch, "B")
+    del at.query_params["evaluate"]
+    at.run()
+    assert at.session_state["evaluation_mode"] is True
+    assert not any(b.key in ("reset_demo", "new_session", "clear_chat") for b in at.button)
+
+
+def test_a_session_with_a_url_change_is_still_one_condition(tmp_path, monkeypatch):
+    from mpa.analysis import load_rows, summarise_sessions
+    at = _locked(tmp_path, monkeypatch, "B")
+    at.session_state["eval_schedule"] = ["S3-birthday"]
+    at.query_params["condition"] = "A"                    # the reproduced switch, before the task
+    at.run()
+    at.button(key="start_task").click().run()
+    at.checkbox(key="pred_m2").check()
+    next(b for b in at.button if b.label == "Show me the reply").click().run()
+    msg = [m for m in at.session_state["messages"] if m["role"] == "assistant"][0]
+    at.button(key=f"flag_{msg['turn_id']}").click().run()
+    at.button(key="task_done").click().run()
+    logs = sorted((tmp_path / "sessions").glob("*/interaction_log.csv"))
+    [s] = summarise_sessions(load_rows(logs))
+    assert s["condition"] == "B"
+
+
+def test_switching_the_setting_in_evaluation_mode_starts_a_new_session(app, tmp_path):
+    from mpa.analysis import load_rows, summarise_sessions
+    _evaluation(app)
+    _schedule(app, "S3-birthday")
+    _start_task(app, "Can you write a birthday message", ["m2"])
+    first = app.session_state["session_id"]
+    app.radio(key="condition").set_value("B").run()
+    assert app.session_state["session_id"] != first and app.session_state["messages"] == []
+    _schedule(app, "S3-birthday")
+    _start_task(app, "Can you write a birthday message", ["m2"])
+    sessions = summarise_sessions(load_rows(sorted((tmp_path / "sessions").glob("*/interaction_log.csv"))))
+    assert sorted(s["condition"] for s in sessions) == ["A", "B"]          # never "mixed"
