@@ -1,7 +1,7 @@
 """Summarise evaluation-mode sessions from interaction logs.
 
 Usage (from the repo root):
-    python eval/summarise_sessions.py                                        # runtime/interaction_log.csv
+    python eval/summarise_sessions.py                                        # every session in runtime/sessions/
     python eval/summarise_sessions.py logs/*.csv                             # several downloaded logs
     python eval/summarise_sessions.py --include-incomplete                   # also unfinished sessions
     python eval/summarise_sessions.py eval/sample_session_log_SIMULATED.csv  # the simulated sample
@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import csv
 import glob
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -29,7 +30,10 @@ sys.path.insert(0, str(ROOT))
 from mpa.analysis import (MEASURES, SETTING_NAMES, by_scenario, condition_table,  # noqa: E402
                           load_rows, markdown_table, summarise_conditions, summarise_sessions)
 
-DEFAULT_LOG = ROOT / "runtime" / "interaction_log.csv"
+RUNTIME = Path(os.getenv("MPA_RUNTIME_DIR", ROOT / "runtime"))
+# One log per session (runtime/sessions/<id>/interaction_log.csv); the single shared log
+# written by earlier versions of the app is still read if it exists.
+DEFAULT_LOGS = [str(RUNTIME / "sessions" / "*" / "interaction_log.csv"), str(RUNTIME / "interaction_log.csv")]
 OUT_DIR = ROOT / "eval" / "session_summaries"
 
 
@@ -43,7 +47,7 @@ def _print_table(rows: list[list[str]]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("logs", nargs="*", help="interaction log CSVs (default: runtime/interaction_log.csv)")
+    parser.add_argument("logs", nargs="*", help="interaction log CSVs (default: every session under runtime/sessions/)")
     parser.add_argument("--include-incomplete", action="store_true",
                         help="include sessions that did not finish the questionnaire")
     parser.add_argument("--note", default="", help="e.g. 'simulated sample'")
@@ -54,9 +58,9 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
 
-    paths = [Path(p) for pattern in (args.logs or [str(DEFAULT_LOG)]) for p in glob.glob(pattern)]
+    paths = [Path(p) for pattern in (args.logs or DEFAULT_LOGS) for p in glob.glob(pattern)]
     if not paths:
-        parser.error("no log files found; download one from 'Demo and evaluation controls' or pass a path")
+        parser.error("no log files found; run a session first, or pass a downloaded log's path")
     rows = load_rows(paths)
     sessions = summarise_sessions(rows)
     if not sessions:

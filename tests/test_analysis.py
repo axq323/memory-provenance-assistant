@@ -161,7 +161,8 @@ def test_two_sessions_through_the_app_are_summarised(tmp_path, monkeypatch):
 
     session("A", "flag")     # questions the misapplied formal tone
     session("B", "ok")       # accepts it
-    people = {p["condition"]: p for p in summarise_sessions(load_rows([tmp_path / "interaction_log.csv"]))}
+    logs = sorted((tmp_path / "sessions").glob("*/interaction_log.csv"))
+    people = {p["condition"]: p for p in summarise_sessions(load_rows(logs))}
     assert set(people) == {"A", "B"} and all(p["complete"] for p in people.values())
     assert people["A"]["reliance_appropriate"] == 1.0 and people["A"]["fit_accuracy"] == 1.0
     assert people["B"]["over_reliance"] == 1.0 and people["B"]["fit_accuracy"] == 0.0

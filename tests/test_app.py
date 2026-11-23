@@ -19,6 +19,11 @@ def app(tmp_path, monkeypatch):
     return at
 
 
+def _all_logs(tmp_path):
+    """Every session's log, concatenated (each session writes its own file)."""
+    return "".join(p.read_text() for p in sorted((tmp_path / "sessions").glob("*/interaction_log.csv")))
+
+
 def _button(at, label_start):
     return next(b for b in at.button if b.label.startswith(label_start))
 
@@ -90,7 +95,7 @@ def test_condition_b_hides_source_context(app):
 def test_verdict_is_logged(app, tmp_path):
     app.chat_input[0].set_value(EXPLAIN).run()
     next(b for b in app.button if (b.key or "").startswith("flag_")).click().run()
-    log = (tmp_path / "interaction_log.csv").read_text()
+    log = _all_logs(tmp_path)
     assert "reply_flagged" in log and "used=m1" in log
 
 
@@ -107,7 +112,7 @@ def test_influence_check_shows_measured_memories(app, tmp_path):
     assert texts.count("Not used, as the assistant said") == 2   # m1, m2
     captions = " ".join(c.value for c in app.caption)
     assert "removing it changed the reply" in captions and "removing it made no difference" in captions
-    log = (tmp_path / "interaction_log.csv").read_text()
+    log = _all_logs(tmp_path)
     assert "influence_checked" in log and "m3=agrees" in log
 
 
@@ -192,7 +197,7 @@ def test_clear_chat_keeps_memories_and_corrections(app, tmp_path):
     assert not app.exception
     assert app.session_state["messages"] == []
     assert any("Not used for explanations" in c.value for c in app.caption)   # correction kept
-    assert "chat_cleared" in (tmp_path / "interaction_log.csv").read_text()
+    assert "chat_cleared" in _all_logs(tmp_path)
 
 
 def test_no_report_caption_does_not_claim_no_memories_were_used(app):
@@ -228,7 +233,7 @@ def test_prediction_is_logged_against_what_was_used(app, tmp_path):
     assert not app.exception
     reply = app.session_state["messages"][-1]
     assert reply["role"] == "assistant" and reply["prediction"]["exact"] is True
-    log = (tmp_path / "interaction_log.csv").read_text()
+    log = _all_logs(tmp_path)
     assert "prediction_made" in log
     assert "predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday" in log
 
@@ -241,7 +246,7 @@ def test_none_of_them_and_empty_prediction(app, tmp_path):
     app.checkbox(key="pred_none").check()
     _submit_prediction(app)
     assert not app.exception
-    log = (tmp_path / "interaction_log.csv").read_text()
+    log = _all_logs(tmp_path)
     assert "predicted=none;used=m3,m4;exact=False;jaccard=0.0;scenario=S1-dinner" in log
 
 
@@ -322,7 +327,7 @@ def test_memory_panel_can_restrict_a_memory_without_a_reply(app, tmp_path):
     assert any(c.value == "⛔ Not used for summaries" for c in app.caption)
     options = app.selectbox(key="nft_pick_m1").options
     assert "summaries" not in options and "explanations" in options
-    assert "from memory panel" in (tmp_path / "interaction_log.csv").read_text()
+    assert "from memory panel" in _all_logs(tmp_path)
 
 
 def test_check_lets_the_user_see_the_reply_without_a_memory(app):
@@ -353,7 +358,7 @@ def test_check_can_be_run_again_on_the_same_reply(app, tmp_path):
     assert "influence" not in _assistant(app)[0]
     app.button(key=f"infl_{turn}").click().run()
     assert not app.exception
-    assert (tmp_path / "interaction_log.csv").read_text().count("influence_checked") == 2
+    assert _all_logs(tmp_path).count("influence_checked") == 2
 
 
 # ------------------------------------------------- evaluation mode: reaction, then fit question ---
@@ -373,7 +378,7 @@ def _start_task(app, prompt_start, predict):
 
 
 def _log(tmp_path):
-    return (tmp_path / "interaction_log.csv").read_text()
+    return _all_logs(tmp_path)
 
 
 def test_new_prompts_wait_until_the_task_is_finished(app):
@@ -512,8 +517,7 @@ def test_every_statement_must_be_answered(app, tmp_path):
     app.radio(key="q_trust").set_value(4)
     next(b for b in app.button if b.label == "Submit").click().run()
     assert any("answer every statement" in w.value for w in app.warning)
-    log_file = tmp_path / "interaction_log.csv"
-    assert not log_file.exists() or "questionnaire_answered" not in log_file.read_text()
+    assert "questionnaire_answered" not in _all_logs(tmp_path)
 
 
 def test_new_session_gets_a_new_session_and_fresh_state(app, tmp_path):
@@ -531,3 +535,69 @@ def test_new_session_gets_a_new_session_and_fresh_state(app, tmp_path):
 def test_no_questionnaire_outside_evaluation_mode(app):
     app.chat_input[0].set_value(BIRTHDAY).run()
     assert not any(b.key == "finish_session" for b in app.button)
+
+
+# ------------------------------------------------- locked, isolated sessions ---
+def _locked(tmp_path, monkeypatch, condition="B"):
+    monkeypatch.setenv("MODE", "replay")
+    monkeypatch.setenv("MPA_RUNTIME_DIR", str(tmp_path))
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.query_params["evaluate"] = "1"
+    at.query_params["condition"] = condition
+    at.run()
+    assert not at.exception
+    return at
+
+
+def test_locked_session_fixes_the_condition_and_hides_developer_controls(tmp_path, monkeypatch):
+    at = _locked(tmp_path, monkeypatch, "B")
+    assert at.session_state["condition"] == "B" and at.session_state["evaluation_mode"] is True
+    keys = {w.key for w in list(at.radio) + list(at.toggle) + list(at.button)}
+    assert not keys & {"condition", "developer_view", "evaluation_mode", "influence_check",
+                       "reset_demo", "new_session", "clear_chat"}
+    assert not any((b.key or "").startswith("src_") for b in at.button)    # no sources in B
+
+
+def test_locked_condition_is_enforced_on_every_run(tmp_path, monkeypatch):
+    at = _locked(tmp_path, monkeypatch, "B")
+    at.session_state["condition"] = "A"           # e.g. stale state from before the lock
+    at.session_state["developer_view"] = True
+    at.run()
+    assert at.session_state["condition"] == "B" and at.session_state["developer_view"] is False
+
+
+def _session(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODE", "replay")
+    monkeypatch.setenv("MPA_RUNTIME_DIR", str(tmp_path))
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.run()
+    return at
+
+
+def test_a_correction_in_one_session_does_not_change_another(tmp_path, monkeypatch):
+    first, second = _session(tmp_path, monkeypatch), _session(tmp_path, monkeypatch)
+    assert first.session_state["session_id"] != second.session_state["session_id"]
+    first.selectbox(key="nft_pick_m2").set_value("personal_message").run()
+    first.button(key="nft_apply_m2").click().run()
+    second.chat_input[0].set_value(BIRTHDAY).run()
+    reply = [m for m in second.session_state["messages"] if m["role"] == "assistant"][0]
+    assert {u["id"] for u in reply["reply"].used} == {"m2"}            # still the seeded memory
+
+
+def test_each_session_writes_only_its_own_log(tmp_path, monkeypatch):
+    first, second = _session(tmp_path, monkeypatch), _session(tmp_path, monkeypatch)
+    first.chat_input[0].set_value(DINNER).run()
+    second.chat_input[0].set_value(BIRTHDAY).run()
+    for at in (first, second):
+        sid = at.session_state["session_id"]
+        rows = (tmp_path / "sessions" / sid / "interaction_log.csv").read_text().splitlines()[1:]
+        assert rows and all(f",{sid}," in r for r in rows)
+
+
+def test_new_session_starts_from_fresh_memories_and_keeps_the_old_files(app, tmp_path):
+    old = app.session_state["session_id"]
+    app.button(key=f"forget_panel:m1").click().run()
+    app.button(key="new_session").click().run()
+    new = app.session_state["session_id"]
+    assert '"m1"' not in (tmp_path / "sessions" / old / "memories.json").read_text()
+    assert '"m1"' in (tmp_path / "sessions" / new / "memories.json").read_text()

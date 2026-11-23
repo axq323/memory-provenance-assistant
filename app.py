@@ -46,11 +46,29 @@ def load_judge():
 model = load_model()
 judge = load_judge()
 MODE = "replay" if isinstance(model, ReplayModel) else "live"
-store = MemoryStore(path=RUNTIME / "memories.json")
+
+# A locked evaluation session (?evaluate=1 in the URL) is what a participant sees: evaluation mode
+# is on, the memory-sources setting comes from the URL (?condition=B) and can't be changed, and
+# the developer, reset and download controls are hidden.
+SESSION_LOCKED = st.query_params.get("evaluate", "0") == "1"
+URL_CONDITION = "B" if st.query_params.get("condition", "A").upper() == "B" else "A"
 
 ss = st.session_state
 ss.setdefault("messages", [])          # user / assistant turns
 ss.setdefault("session_id", uuid.uuid4().hex[:6])
+
+
+def session_dir() -> Path:
+    """Each browser session has its own working copy of the memories and its own log,
+    so one person's corrections can't change another person's replies."""
+    return RUNTIME / "sessions" / ss.session_id
+
+
+def log_path() -> Path:
+    return session_dir() / "interaction_log.csv"
+
+
+store = MemoryStore(path=session_dir() / "memories.json")
 ss.setdefault("open_sources", set())   # keys of source panels currently open
 ss.setdefault("pending_prompt", None)
 ss.setdefault("pending_redo", None)     # index of a reply to rewrite after "Not for ..."
@@ -68,12 +86,17 @@ ss.setdefault("awaiting_fit", False)
 ss.setdefault("questionnaire", None)   # None, "open" or "done" (end of an evaluation session)
 # Memory-sources setting: A = memories shown with where they came from (the design), B = memories
 # only, so the two can be compared. Logged as "condition". Fix it with ?condition=B in the URL.
-ss.setdefault("condition", "B" if st.query_params.get("condition", "A").upper() == "B" else "A")
+ss.setdefault("condition", URL_CONDITION)
+if SESSION_LOCKED:                     # enforced on every run, not just as a default
+    ss.evaluation_mode = True
+    ss.condition = URL_CONDITION
+    ss.developer_view = False
+    ss.influence_check = False
 
 
 def log(event: str, **kw) -> None:
     log_event(event, session_id=ss.session_id, condition=ss.condition, mode=MODE,
-              path=RUNTIME / "interaction_log.csv", **kw)
+              path=log_path(), **kw)
 
 
 # -------------------------------------------------------------- actions ---
@@ -207,19 +230,19 @@ def set_verdict(msg_index: int, verdict: str) -> None:
 
 def reset_demo() -> None:
     store.reset()
-    ss.messages = []
-    ss.open_sources = set()
-    ss.awaiting_prediction = None
-    ss.pending_redo = None
-    ss.eval_task = None
-    ss.awaiting_fit = False
-    ss.questionnaire = None
+    clear_session_state()
     log("demo_reset")
     ss.flash.append("Demo reset: memories restored and chat cleared.")
 
 
 def clear_chat() -> None:
     """Start a fresh conversation but keep the memories and the user's corrections."""
+    clear_session_state()
+    log("chat_cleared")
+    ss.flash.append("Chat cleared. Your memories and corrections are kept.")
+
+
+def clear_session_state() -> None:
     ss.messages = []
     ss.open_sources = set()
     ss.awaiting_prediction = None
@@ -227,14 +250,12 @@ def clear_chat() -> None:
     ss.eval_task = None
     ss.awaiting_fit = False
     ss.questionnaire = None
-    log("chat_cleared")
-    ss.flash.append("Chat cleared. Your memories and corrections are kept.")
 
 
 def new_session() -> None:
-    """Fresh memories, an empty chat and a new session id, so the next person's
-    actions are logged separately (evaluation mode)."""
-    reset_demo()
+    """A new session id with its own fresh copy of the memories and its own log, so the
+    next person's actions are kept apart. The previous session's files are left as they are."""
+    clear_session_state()
     ss.session_id = uuid.uuid4().hex[:6]
     shown = "shown" if ss.condition == "A" else "hidden"
     ss.flash = [f"New session {ss.session_id}: memory sources {shown}."]
@@ -251,7 +272,7 @@ def _now() -> str:
 
 def _task_rows(turn_id: str) -> list[dict]:
     """This session's log rows after the task's prediction was made."""
-    rows = [r for r in read_log(RUNTIME / "interaction_log.csv") if r["session_id"] == ss.session_id]
+    rows = [r for r in read_log(log_path()) if r["session_id"] == ss.session_id]
     start = max((i for i, r in enumerate(rows)
                  if r["event"] == "prediction_made" and r["turn_id"] == turn_id), default=-1)
     return rows[start + 1:]
@@ -551,21 +572,8 @@ def render_memory_panel() -> None:
                 render_source(mem["id"])
 
 
-# ---------------------------------------------------------------- page ---
-SHOW_SOURCES = ss.condition == "A"
-# In evaluation mode a new prompt waits until the current task (prediction -> reply -> fit) is finished.
-LOCKED = bool(ss.awaiting_prediction) or (ss.evaluation_mode and (ss.eval_task is not None
-                                                             or ss.questionnaire is not None))
-for note in ss.flash:
-    st.toast(note)
-ss.flash = []
-
-with st.sidebar:
-    st.title("🧠 Memory Provenance Assistant")
-    st.caption(f"Mode: **{MODE}** · Session `{ss.session_id}`")
-    st.divider()
-    render_memory_panel()
-    st.divider()
+def render_controls() -> None:
+    """Developer controls. Hidden in a locked evaluation session (?evaluate=1)."""
     with st.expander("Demo and evaluation controls"):
         st.radio("Memory sources", ["A", "B"], key="condition",
                  format_func=lambda c: {"A": "Shown: memories + where they came from",
@@ -584,12 +592,38 @@ with st.sidebar:
         st.button("Reset demo", key="reset_demo", on_click=reset_demo,
                   help="Restores the original memories and clears the chat.")
         st.button("Start a new session", key="new_session", on_click=new_session,
-                  help="Resets the demo and logs what happens next under a new session ID, "
+                  help="Starts a new session ID with fresh memories and its own log, "
                        "keeping the memory-sources setting.")
-        log_file = RUNTIME / "interaction_log.csv"
-        if log_file.exists():
-            st.download_button("Download interaction log", log_file.read_bytes(),
-                               file_name=f"interaction_log_{ss.session_id}.csv", mime="text/csv")
+        render_log_download()
+        st.caption("For a participant, open the app with `?evaluate=1` (sources shown) or "
+                   "`?evaluate=1&condition=B` (sources hidden). That locks the setting and hides these controls.")
+
+
+def render_log_download() -> None:
+    """This session's log only."""
+    if log_path().exists():
+        st.download_button("Download this session's log", log_path().read_bytes(),
+                           file_name=f"interaction_log_{ss.session_id}.csv", mime="text/csv",
+                           key="download_log")
+
+
+# ---------------------------------------------------------------- page ---
+SHOW_SOURCES = ss.condition == "A"
+# In evaluation mode a new prompt waits until the current task (prediction -> reply -> fit) is finished.
+LOCKED = bool(ss.awaiting_prediction) or (ss.evaluation_mode and (ss.eval_task is not None
+                                                             or ss.questionnaire is not None))
+for note in ss.flash:
+    st.toast(note)
+ss.flash = []
+
+with st.sidebar:
+    st.title("🧠 Memory Provenance Assistant")
+    st.caption(f"Mode: **{MODE}** · Session `{ss.session_id}`")
+    st.divider()
+    render_memory_panel()
+    if not SESSION_LOCKED:
+        st.divider()
+        render_controls()
 
 st.header("Your assistant")
 if MODE == "replay":
@@ -702,6 +736,9 @@ def render_session_end() -> None:
     if ss.questionnaire == "done":
         with st.chat_message("assistant", avatar="🔮"):
             st.success("Thank you, that's the end of the session. Your answers are saved in the interaction log.")
+            if SESSION_LOCKED:
+                st.caption("For the person running the session:")
+                render_log_download()
         return
     if ss.questionnaire is None:
         with st.chat_message("assistant", avatar="🔮"):
