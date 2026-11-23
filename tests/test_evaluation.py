@@ -39,7 +39,10 @@ def test_task_summary_counts_what_the_user_did():
     rows = [_row("source_opened", "m2"), _row("source_closed", "m2"), _row("not_for_task", "m2"),
             _row("reply_shown"), _row("source_opened", "m3"), _row("reply_accepted")]
     s = summarise_task(rows, "2026-11-22T10:00:00", "2026-11-22T10:01:05")
-    assert s == {"accepted": True, "flagged": False, "corrected": ["m2"], "sources_opened": 2, "seconds": 65}
+    assert s == {"accepted": True, "flagged": False, "corrected": ["m2"], "decision": "accepted+corrected",
+                 "sources_opened": 2, "seconds": 65}
+    assert summarise_task([_row("source_opened", "m2")], "2026-11-22T10:00:00",
+                          "2026-11-22T10:00:10")["decision"] == "none"
 
 
 def _b(accepted=False, flagged=False, corrected=()):
@@ -51,8 +54,9 @@ def test_reliance_outcomes():
     assert reliance({"m2"}, set(), _b(flagged=True)) == "appropriate"
     assert reliance({"m2"}, set(), _b(corrected=["m2"])) == "appropriate"
     assert reliance({"m2"}, set(), _b(accepted=True)) == "over-reliance"
-    assert reliance({"m2"}, set(), _b()) == "over-reliance"                     # did nothing
+    assert reliance({"m2"}, set(), _b()) == "no decision"                       # did nothing
     assert reliance({"m2"}, set(), _b(corrected=["m3"])) == "over-reliance"     # corrected the wrong memory
+    assert reliance(set(), {"m3", "m4"}, _b()) == "no decision"
     # only fitting memories: accepting is appropriate, questioning them is under-reliance
     assert reliance(set(), {"m3", "m4"}, _b(accepted=True)) == "appropriate"
     assert reliance(set(), {"m3", "m4"}, _b(corrected=["m4"])) == "under-reliance"
@@ -74,3 +78,42 @@ def test_questionnaire_items_are_unique_and_only_effort_is_reversed():
 def test_comments_are_made_safe_for_the_log():
     assert clean_comment("Good;\nbut slow  ") == "Good, but slow"
     assert len(clean_comment("x" * 900)) == 500
+
+
+# ------------------------------------------------------------ corrections ---
+from mpa.evaluation import correction_actions, correction_outcome, final_state  # noqa: E402
+
+START = {"text": "You want a formal, professional tone.", "excluded_tasks": []}
+
+
+def test_final_state_after_the_task():
+    assert final_state(START, None, "personal_message") == "forgotten"
+    assert final_state(START, dict(START), "personal_message") == "unchanged"
+    assert final_state(START, {**START, "excluded_tasks": ["personal_message"]}, "personal_message") == "restricted"
+    assert final_state(START, {**START, "excluded_tasks": ["plan"]}, "personal_message") == "restricted elsewhere"
+    assert final_state(START, {"text": "Formal for work.", "excluded_tasks": []}, "personal_message") == "edited"
+    # a restriction that was already there before the task is not credited to it
+    before = {**START, "excluded_tasks": ["personal_message"]}
+    assert final_state(before, dict(before), "personal_message") == "unchanged"
+
+
+def test_correction_outcomes():
+    m = {"m2"}
+    assert correction_outcome(m, set(), {"m2": "restricted"}, ["restrict:m2@personal_message"]) == "scoped"
+    assert correction_outcome(m, set(), {"m2": "forgotten"}, ["forget:m2"]) == "forgot"
+    assert correction_outcome(m, set(), {"m2": "edited"}, ["edit:m2"]) == "edited"
+    assert correction_outcome(m, set(), {"m2": "restricted elsewhere"}, ["restrict:m2@plan"]) == "wrong scope"
+    assert correction_outcome(m, set(), {"m2": "unchanged"},
+                              ["restrict:m2@personal_message", "undo:m2@personal_message"]) == "undone"
+    assert correction_outcome(m, set(), {"m2": "unchanged"}, []) == "none"
+    assert correction_outcome(set(), {"m3"}, {"m3": "forgotten"}, ["forget:m3"]) == "unneeded"
+    assert correction_outcome(set(), {"m3"}, {"m3": "unchanged"}, []) == "none"
+    assert correction_outcome(set(), set(), {}, []) == "n/a"
+
+
+def test_correction_actions_keep_order_and_scope():
+    rows = [{"event": "not_for_task", "memory_id": "m2", "task": "personal_message"},
+            {"event": "source_opened", "memory_id": "m2", "task": ""},
+            {"event": "undo_not_for_task", "memory_id": "m2", "task": "personal_message"},
+            {"event": "memory_forgotten", "memory_id": "m2", "task": ""}]
+    assert correction_actions(rows) == ["restrict:m2@personal_message", "undo:m2@personal_message", "forget:m2"]

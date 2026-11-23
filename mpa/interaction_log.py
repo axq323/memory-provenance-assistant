@@ -15,20 +15,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LOG_PATH = ROOT / "runtime" / "interaction_log.csv"
 
+# trial_id: the evaluation task an event belongs to (empty outside evaluation tasks).
 FIELDS = ["timestamp", "session_id", "condition", "mode", "turn_id", "task",
-          "event", "memory_id", "detail"]
+          "event", "memory_id", "detail", "trial_id"]
 
 EVENTS = {
     "reply_shown", "source_opened", "source_closed", "not_for_task", "undo_not_for_task",
     "memory_edited", "memory_forgotten", "reply_accepted", "reply_flagged", "demo_reset",
     "influence_checked", "chat_cleared", "prediction_made", "task_finished", "fit_judged",
-    "questionnaire_answered", "session_finished", "session_started",
+    "questionnaire_answered", "session_finished", "session_started", "reason_given",
 }
 
 
 def log_event(event: str, *, session_id: str, condition: str, mode: str,
               turn_id: str = "", task: str = "", memory_id: str = "", detail: str = "",
-              path: Path = LOG_PATH) -> None:
+              trial_id: str = "", path: Path = LOG_PATH) -> None:
     if event not in EVENTS:
         raise ValueError(f"Unknown event {event!r}")
     path = Path(path)
@@ -42,7 +43,7 @@ def log_event(event: str, *, session_id: str, condition: str, mode: str,
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "session_id": session_id, "condition": condition, "mode": mode,
             "turn_id": turn_id, "task": task, "event": event,
-            "memory_id": memory_id, "detail": detail})
+            "memory_id": memory_id, "detail": detail, "trial_id": trial_id})
 
 
 def read_log(path: Path = LOG_PATH) -> list[dict]:

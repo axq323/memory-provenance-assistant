@@ -5,11 +5,20 @@ grouped by the memory-sources setting (A = sources shown, B = sources hidden),
 so a session with more tasks does not count more than one with fewer.
 
   predictive understanding  prediction_made  -> exact-match rate, mean overlap (Jaccard)
-  applicability judgement   fit_judged       -> accuracy against ground truth, "not sure" rate
+  applicability judgement   fit_judged       -> accuracy against ground truth, "not sure" rate;
+                                                scope error identified = judged a misapplied
+                                                memory as not suiting the request (diagnosis)
+  correction                task_finished    -> on replies with a misapplied memory: restricted
+                                                for that kind of request and kept ("scoped", the
+                                                appropriate fix) vs forgotten (over-correction).
+                                                Kept apart from diagnosis: one can be right
+                                                without the other
   behavioural reliance      task_finished    -> appropriate-reliance rate; over-reliance on
                                                 misapplied replies (the risk that source context
                                                 lends them credibility, Assignment 1 Gap);
-                                                under-reliance on suitable replies
+                                                under-reliance on suitable replies;
+                                                "no decision" (finished without acting) is
+                                                reported on its own and left out of those rates
   checking effort           task_finished    -> sources opened and seconds per task
   self-reported attitudes   questionnaire    -> mean per item, kept apart from behaviour
                                                 (Bucinca et al., 2021); effort reverse-scored
@@ -40,9 +49,13 @@ MEASURES = [
     ("prediction_overlap", "Prediction: mean overlap (0-1)", True),
     ("fit_accuracy", "Fit judgement: accuracy", True),
     ("fit_unsure", "Fit judgement: 'not sure' rate", None),
+    ("scope_error_identified", "Diagnosis: misapplied memory judged unsuitable", True),
+    ("correction_scoped", "Correction: scoped and kept (appropriate)", True),
+    ("correction_forgot", "Correction: forgotten instead (over-correction)", False),
     ("reliance_appropriate", "Reliance: appropriate rate", True),
     ("over_reliance", "Over-reliance on misapplied replies", False),
     ("under_reliance", "Under-reliance on suitable replies", False),
+    ("no_decision", "Reliance: no decision rate", None),
     ("sources_per_task", "Effort: sources opened per task", None),
     ("seconds_per_task", "Effort: seconds per task", None),
 ] + [(f"q_{i}", f"Questionnaire: {i}" + (" (reversed)" if i in REVERSED else ""), True)
@@ -107,7 +120,10 @@ def summarise_session(rows: list[dict]) -> dict | None:
     conditions = {r["condition"] for r in rows if r["event"] in ("prediction_made", "task_finished")}
 
     scored_fits = [f for f in fits if f.get("correct") in ("True", "False")]
-    judged = [t for t in tasks if t.get("reliance") not in (None, "n/a")]
+    misapplied_fits = [f for f in fits if f.get("truth") == "misapplied"]
+    with_misapplied = [t for t in tasks if t.get("misapplied_shown", "none") != "none" and "correction" in t]
+    annotated = [t for t in tasks if t.get("reliance") not in (None, "n/a")]
+    judged = [t for t in annotated if t["reliance"] != "no decision"]
     misapplied = [t for t in judged if t.get("misapplied_shown", "none") != "none"]
     suitable = [t for t in judged if t.get("misapplied_shown", "none") == "none"]
 
@@ -121,9 +137,13 @@ def summarise_session(rows: list[dict]) -> dict | None:
         "prediction_overlap": _avg([float(p["jaccard"]) for p in predictions if "jaccard" in p]),
         "fit_accuracy": _rate([f["correct"] == "True" for f in scored_fits]),
         "fit_unsure": _rate([f.get("answer") == "unsure" for f in fits]),
+        "scope_error_identified": _rate([f.get("answer") == "no" for f in misapplied_fits]),
+        "correction_scoped": _rate([t["correction"].split("+")[0] == "scoped" for t in with_misapplied]),
+        "correction_forgot": _rate([t["correction"].split("+")[0] == "forgot" for t in with_misapplied]),
         "reliance_appropriate": _rate([t["reliance"] == "appropriate" for t in judged]),
         "over_reliance": _rate([t["reliance"] == "over-reliance" for t in misapplied]),
         "under_reliance": _rate([t["reliance"] == "under-reliance" for t in suitable]),
+        "no_decision": _rate([t["reliance"] == "no decision" for t in annotated]),
         "sources_per_task": _avg([int(t.get("sources_opened", 0)) for t in tasks]),
         "seconds_per_task": _avg([int(t.get("seconds", 0)) for t in tasks]),
     }
@@ -170,7 +190,7 @@ def by_scenario(rows: list[dict], sessions: set[str] | None = None) -> list[dict
         elif r["event"] == "task_finished":
             cell = cells[(r["condition"], d.get("scenario", "unknown"))]
             cell["tasks"] += 1
-            if d.get("reliance") not in (None, "n/a"):
+            if d.get("reliance") not in (None, "n/a", "no decision"):
                 cell["appropriate"].append(d["reliance"] == "appropriate")
     return [{"condition": c, "scenario": sc, "tasks": v["tasks"],
              "prediction_exact": _rate(v["exact"]), "fit_accuracy": _rate(v["fit"]),

@@ -21,8 +21,9 @@ from mpa.display import tame_headings  # noqa: E402
 from mpa.interaction_log import log_event, read_log  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
-from mpa.evaluation import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, clean_comment, ground_truth,  # noqa: E402
-                       reliance, score_fit, score_prediction, summarise_task)
+from mpa.evaluation import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, clean_comment,  # noqa: E402
+                            correction_actions, correction_outcome, final_state, ground_truth,
+                            reliance, score_fit, score_prediction, summarise_task)
 from mpa.task_types import LABELS, classify, label  # noqa: E402
 from mpa.validate import ValidatedReply, validate  # noqa: E402
 
@@ -82,7 +83,9 @@ ss.setdefault("awaiting_prediction", None)  # prompt waiting for the user's pred
 # A task runs from the prediction to the fit question: {"msg_index", "turn_id", "started"}.
 # While it is open the user reacts freely; new prompts are locked until it is finished.
 ss.setdefault("eval_task", None)
+ss.setdefault("awaiting_reason", False)  # after "I'm done": "What made you choose that?"
 ss.setdefault("awaiting_fit", False)
+ss.setdefault("trial_count", 0)        # evaluation tasks started in this session
 ss.setdefault("questionnaire", None)   # None, "open" or "done" (end of an evaluation session)
 # Memory-sources setting: A = memories shown with where they came from (the design), B = memories
 # only, so the two can be compared. Logged as "condition". Fix it with ?condition=B in the URL.
@@ -94,9 +97,32 @@ if SESSION_LOCKED:                     # enforced on every run, not just as a de
     ss.influence_check = False
 
 
-def log(event: str, **kw) -> None:
+# Actions that can happen in the memory panel, without a reply. During an evaluation task they
+# belong to the open task; between tasks the panel is read-only in evaluation mode.
+PANEL_EVENTS = {"source_opened", "source_closed", "not_for_task", "undo_not_for_task",
+                "memory_edited", "memory_forgotten"}
+
+
+def trial_of(turn_id: str) -> str:
+    """The evaluation task (trial) a reply belongs to. Rewrites inherit the original's trial."""
+    for m in ss.messages:
+        if m["role"] == "assistant" and m["turn_id"] == turn_id:
+            return m.get("trial_id", "")
+    return ""
+
+
+def log(event: str, trial_id: str | None = None, **kw) -> None:
+    """Log one event. An action on a reply is filed under that reply's trial, so acting on an
+    earlier reply can never be scored as part of a later task."""
+    if trial_id is None:
+        if kw.get("turn_id"):
+            trial_id = trial_of(kw["turn_id"])
+        elif event in PANEL_EVENTS and ss.get("eval_task"):
+            trial_id = ss.eval_task["trial_id"]
+        else:
+            trial_id = ""
     log_event(event, session_id=ss.session_id, condition=ss.condition, mode=MODE,
-              path=log_path(), **kw)
+              path=log_path(), trial_id=trial_id, **kw)
 
 
 # -------------------------------------------------------------- actions ---
@@ -118,17 +144,17 @@ def history_of(msg: dict) -> list[dict]:
     return [dict(h) for h in msg.get("history", [])]
 
 
-def respond(user_text: str, history: list[dict]) -> dict:
+def respond(user_text: str, history: list[dict], trial_id: str = "") -> dict:
     task, trigger = classify(user_text)
     record = assemble(user_text, store.all(), task, trigger, history)
     try:
         reply = validate(model.generate(record, user_text), record.sent_ids)
     except ModelError as exc:
         reply = ValidatedReply(answer="Sorry, I couldn't reach the model.", parse_ok=False, note=str(exc))
-    log("reply_shown", turn_id=record.turn_id, task=task,
+    log("reply_shown", turn_id=record.turn_id, task=task, trial_id=trial_id,
         detail="used=" + ",".join(u["id"] for u in reply.used))
     return {"role": "assistant", "turn_id": record.turn_id, "user_text": user_text,
-            "task": task, "reply": reply, "record": record,
+            "task": task, "reply": reply, "record": record, "trial_id": trial_id,
             "history": [dict(h) for h in history]}
 
 
@@ -155,7 +181,7 @@ def not_for_task(msg_index: int, memory_id: str) -> None:
     store.exclude_for_task(memory_id, task)
     log("not_for_task", turn_id=msg["turn_id"], task=task, memory_id=memory_id)
     ss.messages.append({"role": "notice", "kind": "excluded", "memory_id": memory_id, "task": task,
-                        "undone": False,
+                        "undone": False, "turn_id": msg["turn_id"],
                         "text": f"Got it. I won't use “{mem['text']}” for {label(task)}. "
                                 "Here's that reply again without it."})
     ss.pending_redo = msg_index   # rewritten in the page script, so a progress message can show
@@ -166,7 +192,7 @@ def run_pending_redo() -> None:
     msg = ss.messages[ss.pending_redo]
     ss.pending_redo = None
     with st.spinner("Rewriting the reply without that memory…"):
-        redo = respond(msg["user_text"], history_of(msg))
+        redo = respond(msg["user_text"], history_of(msg), trial_id=msg.get("trial_id", ""))
     redo["regenerated_from"] = msg["turn_id"]
     ss.messages.append(redo)
 
@@ -177,7 +203,8 @@ def undo_exclusion(notice_index: int) -> None:
         return
     store.include_for_task(notice["memory_id"], notice["task"])
     notice["undone"] = True
-    log("undo_not_for_task", task=notice["task"], memory_id=notice["memory_id"])
+    log("undo_not_for_task", turn_id=notice.get("turn_id", ""), task=notice["task"],
+        memory_id=notice["memory_id"])
     ss.flash.append(f"Undone: I'll use that memory for {label(notice['task'])} again.")
 
 
@@ -248,6 +275,7 @@ def clear_session_state() -> None:
     ss.awaiting_prediction = None
     ss.pending_redo = None
     ss.eval_task = None
+    ss.awaiting_reason = False
     ss.awaiting_fit = False
     ss.questionnaire = None
 
@@ -256,6 +284,7 @@ def new_session() -> None:
     """A new session id with its own fresh copy of the memories and its own log, so the
     next person's actions are kept apart. The previous session's files are left as they are."""
     clear_session_state()
+    ss.trial_count = 0
     ss.session_id = uuid.uuid4().hex[:6]
     shown = "shown" if ss.condition == "A" else "hidden"
     ss.flash = [f"New session {ss.session_id}: memory sources {shown}."]
@@ -270,12 +299,12 @@ def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
-def _task_rows(turn_id: str) -> list[dict]:
-    """This session's log rows after the task's prediction was made."""
-    rows = [r for r in read_log(log_path()) if r["session_id"] == ss.session_id]
-    start = max((i for i, r in enumerate(rows)
-                 if r["event"] == "prediction_made" and r["turn_id"] == turn_id), default=-1)
-    return rows[start + 1:]
+def _task_rows(trial_id: str) -> list[dict]:
+    """This session's log rows for one task: actions on its reply, on rewrites of that
+    reply, and in the memory panel while the task was open. Nothing from other tasks."""
+    return [r for r in read_log(log_path())
+            if r["session_id"] == ss.session_id and r.get("trial_id") == trial_id
+            and r["event"] not in ("prediction_made", "reply_shown")]
 
 
 def finish_task() -> None:
@@ -283,30 +312,42 @@ def finish_task() -> None:
     did (behavioural reliance), then ask the fit question about the memories used."""
     task = ss.eval_task
     msg = ss.messages[task["msg_index"]]
-    used = {u["id"] for u in msg["reply"].used}
+    used = set(task["stimulus"])
     truth = ground_truth(msg["user_text"])
-    behaviour = summarise_task(_task_rows(task["turn_id"]), task["started"], _now())
+    rows = _task_rows(task["trial_id"])
+    behaviour = summarise_task(rows, task["started"], _now())
     misapplied = used & set(truth["misapplied"]) if truth else set()
     fitting = used & set(truth["fits"]) if truth else set()
     outcome = reliance(misapplied, fitting, behaviour)
-    msg["task_summary"] = {**behaviour, "reliance": outcome}
+    # what each correction was, and where each memory in the reply ended up (after any undo)
+    actions = correction_actions(rows)
+    states = {mid: final_state(start, store.get(mid), msg["task"]) for mid, start in task["stimulus"].items()}
+    correction = correction_outcome(misapplied, fitting, states, actions)
+    msg["task_summary"] = {**behaviour, "reliance": outcome, "actions": actions,
+                           "final": states, "correction": correction}
     log("task_finished", turn_id=task["turn_id"], task=msg["task"],
         detail=f"scenario={truth['scenario'] if truth else 'unknown'};"
+               f"decision={behaviour['decision']};"
                f"accepted={behaviour['accepted']};flagged={behaviour['flagged']};"
                f"corrected={','.join(behaviour['corrected']) or 'none'};"
                f"sources_opened={behaviour['sources_opened']};seconds={behaviour['seconds']};"
-               f"misapplied_shown={','.join(sorted(misapplied)) or 'none'};reliance={outcome}")
-    if fit_questions(msg):
-        ss.awaiting_fit = True
+               f"misapplied_shown={','.join(sorted(misapplied)) or 'none'};reliance={outcome};"
+               f"actions={','.join(actions) or 'none'};"
+               f"final={','.join(f'{m}:{v}' for m, v in sorted(states.items())) or 'none'};"
+               f"correction={correction}")
+    if fit_questions():
+        ss.awaiting_reason = True           # neutral question first, then the fit question
     else:                                   # no memory was used, so there is nothing to judge
         ss.eval_task = None
 
 
-def fit_questions(msg: dict) -> list[dict]:
-    """The memories the fit question asks about: those the assistant used in the
-    reply the user reacted to, worded as they were sent (forgotten ones skipped)."""
-    used = {u["id"] for u in msg["reply"].used}
-    return [m for m in msg["record"].memories_sent if m["id"] in used and m["text"] != "[forgotten]"]
+def fit_questions() -> list[dict]:
+    """The memories the fit question asks about: those the assistant used in the original
+    reply of the open task, worded as they were then. Taken from the snapshot made when the
+    task started, so editing or forgetting a memory can't remove or change the question.
+    The snapshot is dropped when the task closes."""
+    task = ss.eval_task
+    return [{"id": mid, "text": m["text"]} for mid, m in (task or {}).get("stimulus", {}).items()]
 
 
 # ------------------------------------------------------------ rendering ---
@@ -338,7 +379,27 @@ def render_edit_forget(cols, mem: dict, key: str, turn_id: str = "") -> None:
                   on_click=forget, args=(mem["id"], turn_id))
 
 
-def render_memory_chip(msg_index: int, msg: dict, used: dict, note: str | None = None) -> None:
+def reply_is_active(msg: dict) -> bool:
+    """Outside evaluation mode every reply can be acted on. In evaluation mode only the replies
+    of the open task can, and only until the user says they're done with it."""
+    if not ss.evaluation_mode:
+        return True
+    task = ss.eval_task
+    return reacting() and msg.get("trial_id") == task["trial_id"]
+
+
+def panel_is_active() -> bool:
+    """In evaluation mode the memory panel can only change memories while a task is open."""
+    return not ss.evaluation_mode or reacting()
+
+
+def reacting() -> bool:
+    """An evaluation task is open and the user hasn't said they're done with the reply yet."""
+    return ss.eval_task is not None and not ss.awaiting_reason and not ss.awaiting_fit
+
+
+def render_memory_chip(msg_index: int, msg: dict, used: dict, note: str | None = None,
+                       interactive: bool = True) -> None:
     """One memory under a reply, with its controls. Used for memories the assistant
     claimed and for memories that were sent but not claimed."""
     mem = store.get(used["id"])
@@ -352,6 +413,8 @@ def render_memory_chip(msg_index: int, msg: dict, used: dict, note: str | None =
             st.caption(f"How it was applied: {used['how']}")
         if note:
             st.caption(note)
+        if not interactive:
+            return
         is_open = key in ss.open_sources
         cols = st.columns([2.2, 2.2, 1, 1]) if SHOW_SOURCES else st.columns([2.2, 1, 1])
         if SHOW_SOURCES:
@@ -466,6 +529,7 @@ def render_influence(msg_index: int, msg: dict) -> None:
 def render_reply(msg_index: int, msg: dict) -> None:
     reply: ValidatedReply = msg["reply"]
     rec = msg["record"]
+    active = reply_is_active(msg)
     st.markdown(tame_headings(reply.answer))
     if reply.note:
         st.warning(reply.note)
@@ -473,7 +537,7 @@ def render_reply(msg_index: int, msg: dict) -> None:
     if reply.used:
         st.markdown("**Memories used in this reply** _(as reported by the assistant)_")
         for used in reply.used:
-            render_memory_chip(msg_index, msg, used, note=check_note(msg, used["id"]))
+            render_memory_chip(msg_index, msg, used, note=check_note(msg, used["id"]), interactive=active)
     elif reply.parse_ok:
         st.caption("The assistant didn't report using any memories.")
     # 2. memories that were sent but not claimed: the assistant could still have used them
@@ -487,7 +551,7 @@ def render_reply(msg_index: int, msg: dict) -> None:
                        "so it may have used them without saying so. You can correct them here too.")
             for m in sorted(unclaimed, key=lambda m: m["id"] not in flagged):   # flagged first
                 render_memory_chip(msg_index, msg, {"id": m["id"], "how": ""},
-                                   note=check_note(msg, m["id"]))
+                                   note=check_note(msg, m["id"]), interactive=active)
     # 3. memories that were not sent, e.g. because the user restricted them
     for w in rec.memories_withheld:
         mem = store.get(w["id"])
@@ -496,6 +560,9 @@ def render_reply(msg_index: int, msg: dict) -> None:
     if verdict:
         st.caption("You marked this reply as working for you." if verdict == "accepted"
                    else "You flagged this reply.")
+    elif not active:
+        if msg.get("trial_id"):
+            st.caption("This task is finished, so this reply can't be changed any more.")
     else:
         c1, c2, _ = st.columns([1.3, 1.3, 3])
         c1.button("👍 This works for me", key=f"ok_{msg['turn_id']}",
@@ -524,6 +591,9 @@ def render_record(msg: dict) -> None:
             st.markdown(f"- **Reaction:** accepted {t['accepted']}, flagged {t['flagged']}, "
                         f"corrected {', '.join(t['corrected']) or 'nothing'}, "
                         f"sources opened {t['sources_opened']}, {t['seconds']} s → **{t['reliance']}**")
+            st.markdown(f"- **Corrections:** {', '.join(t.get('actions') or []) or 'none'} · final state "
+                        f"{', '.join(f'{m}: {v}' for m, v in (t.get('final') or {}).items()) or '–'} "
+                        f"→ **{t.get('correction', '–')}**")
         if msg.get("fit"):
             st.markdown("- **Fit answers:** " + "; ".join(
                 f"{mid}: {f['answer']} (truth: {f['truth']}, correct: {f['correct']})"
@@ -543,6 +613,9 @@ def render_memory_panel() -> None:
     memories = store.all()
     if not memories:
         st.caption("Nothing is stored.")
+    active = panel_is_active()
+    if not active:
+        st.caption("You can change these while a task is open.")
     for mem in memories:
         key = f"panel:{mem['id']}"
         with st.container(border=True):
@@ -554,8 +627,11 @@ def render_memory_panel() -> None:
                 st.caption(f"Saved {mem['created']}")
             for task in mem["excluded_tasks"]:
                 st.caption(f"⛔ Not used for {label(task)}")
-                st.button(f"Use for {label(task)} again", key=f"again_{mem['id']}_{task}",
-                          on_click=use_again, args=(mem["id"], task), use_container_width=True)
+                if active:
+                    st.button(f"Use for {label(task)} again", key=f"again_{mem['id']}_{task}",
+                              on_click=use_again, args=(mem["id"], task), use_container_width=True)
+            if not active:
+                continue
             available = [t for t in LABELS if t not in mem["excluded_tasks"]]
             if available:
                 with st.popover("Don't use for…", use_container_width=True):
@@ -639,7 +715,9 @@ for i, msg in enumerate(ss.messages):
     if msg["role"] == "notice":
         with st.chat_message("assistant", avatar="🛠️"):
             st.success(msg["text"])
-            if msg["kind"] == "excluded" and not msg["undone"]:
+            notice_active = not ss.evaluation_mode or (
+                reacting() and trial_of(msg.get("turn_id", "")) == ss.eval_task["trial_id"])
+            if msg["kind"] == "excluded" and not msg["undone"] and notice_active:
                 st.button("Undo", key=f"undo_{i}", on_click=undo_exclusion, args=(i,))
             elif msg.get("undone"):
                 st.caption("Undone.")
@@ -672,7 +750,9 @@ def render_prediction_step() -> None:
         return
     prompt = ss.awaiting_prediction
     with st.spinner("Thinking…"):
-        reply_msg = respond(prompt, history_before(len(ss.messages) - 1))
+        ss.trial_count += 1                     # per session; clearing the chat doesn't reuse an id
+    trial_id = f"trial{ss.trial_count}"
+    reply_msg = respond(prompt, history_before(len(ss.messages) - 1), trial_id=trial_id)
     used = {u["id"] for u in reply_msg["reply"].used}
     score = score_prediction(predicted, used)
     truth = ground_truth(prompt)
@@ -685,21 +765,45 @@ def render_prediction_step() -> None:
     for key in [f"pred_{m['id']}" for m in memories] + ["pred_none"]:
         ss.pop(key, None)
     ss.awaiting_prediction = None
-    ss.eval_task = {"msg_index": len(ss.messages) - 1, "turn_id": reply_msg["turn_id"], "started": _now()}
+    # The memories the reply used, as they were at the start of the task (for the fit question and
+    # for scoring where each one ended up). Held only while the task is open.
+    sent = {m["id"]: m["text"] for m in reply_msg["record"].memories_sent}
+    stimulus = {mid: {"text": sent[mid], "excluded_tasks": list((store.get(mid) or {}).get("excluded_tasks", []))}
+                for mid in sorted(used) if mid in sent}
+    ss.eval_task = {"msg_index": len(ss.messages) - 1, "turn_id": reply_msg["turn_id"],
+                    "trial_id": trial_id, "started": _now(), "stimulus": stimulus}
     st.rerun()
 
 
 def render_task_controls() -> None:
-    """Evaluation mode, after the reply: free reaction first, then the fit question."""
+    """Evaluation mode, after the reply: free reaction first, then a neutral question about
+    why they did what they did, then the fit question about the original reply."""
     task = ss.eval_task
     msg = ss.messages[task["msg_index"]]
-    if not ss.awaiting_fit:
+    if reacting():
         with st.chat_message("assistant", avatar="🔮"):
             st.markdown("Use the reply however you would normally: accept it, flag it, open sources "
                         "or correct a memory. When you've finished with it, continue.")
             st.button("I'm done with this reply →", key="task_done", on_click=finish_task, type="primary")
         return
-    questions = fit_questions(msg)
+    if ss.awaiting_reason:
+        with st.chat_message("assistant", avatar="🔮"):
+            with st.form("reason_form"):
+                st.text_area("What made you choose what you did with that reply?", key="reason_text",
+                             help="A sentence or two in your own words.")
+                submitted = st.form_submit_button("Continue →")
+        if not submitted:
+            return
+        reason = clean_comment(ss.get("reason_text", ""))
+        if not reason:
+            st.warning("Please write a sentence or two before you continue.")
+            return
+        log("reason_given", turn_id=task["turn_id"], task=msg["task"], detail=f"text={reason}")
+        ss.pop("reason_text", None)
+        ss.awaiting_reason = False
+        ss.awaiting_fit = True
+        st.rerun()
+    questions = fit_questions()
     with st.chat_message("assistant", avatar="🔮"):
         with st.form("fit_form"):
             st.markdown(f"**One last question about your request:** “{msg['user_text']}”")
@@ -722,13 +826,14 @@ def render_task_controls() -> None:
             detail=f"answer={answer};truth={score['truth']};correct={score['correct']};"
                    f"scenario={truth['scenario'] if truth else 'unknown'}")
         ss.pop(f"fit_{mid}", None)
-    ss.eval_task = None
+    ss.eval_task = None                     # drops the snapshot of the memories' wording
     ss.awaiting_fit = False
     st.rerun()
 
 
 def tasks_finished() -> int:
     return sum(1 for m in ss.messages if m.get("task_summary"))
+
 
 
 def render_session_end() -> None:

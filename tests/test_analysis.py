@@ -36,8 +36,9 @@ def log(tmp_path):
         ("prediction_made", "t1", "", "predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday"),
         ("source_opened", "t1", "m2", ""),
         ("reply_flagged", "t1", "", "used=m2"),
-        ("task_finished", "t1", "", "scenario=S3-birthday;accepted=False;flagged=True;corrected=none;"
-                                    "sources_opened=1;seconds=60;misapplied_shown=m2;reliance=appropriate"),
+        ("task_finished", "t1", "", "scenario=S3-birthday;accepted=False;flagged=True;corrected=m2;"
+                                    "sources_opened=1;seconds=60;misapplied_shown=m2;reliance=appropriate;"
+                                    "correction=scoped"),
         ("fit_judged", "t1", "m2", "answer=no;truth=misapplied;correct=True;scenario=S3-birthday"),
         ("prediction_made", "t2", "", "predicted=m3;used=m3,m4;exact=False;jaccard=0.5;scenario=S1-dinner"),
         ("reply_accepted", "t2", "", "used=m3,m4"),
@@ -60,7 +61,8 @@ def log(tmp_path):
     _write(path, "p3", "A", [
         ("prediction_made", "t4", "", "predicted=m1;used=m1;exact=True;jaccard=1.0;scenario=S2-explain"),
         ("task_finished", "t4", "", "scenario=S2-explain;accepted=False;flagged=False;corrected=m1;"
-                                    "sources_opened=2;seconds=90;misapplied_shown=m1;reliance=appropriate"),
+                                    "sources_opened=2;seconds=90;misapplied_shown=m1;reliance=appropriate;"
+                                    "correction=forgot"),
     ])
     return path
 
@@ -92,6 +94,11 @@ def test_session_outcomes(log):
     assert p1["q_trust"] == 6 and p1["q_effort"] == 6                 # effort 2 reversed -> 6
     assert p2["over_reliance"] == 1.0 and p2["under_reliance"] is None  # no suitable-reply task
     assert p2["fit_accuracy"] == 0.0 and p2["q_effort"] == 3
+    # diagnosis and correction are separate outcomes
+    assert p1["scope_error_identified"] == 1.0 and p1["correction_scoped"] == 1.0
+    assert p2["scope_error_identified"] == 0.0 and p2["correction_scoped"] is None   # older log rows
+    p3 = _people(log)["p3"]
+    assert p3["correction_forgot"] == 1.0 and p3["correction_scoped"] == 0.0
 
 
 def test_condition_summary_excludes_incomplete_by_default(log):
@@ -151,6 +158,8 @@ def test_two_sessions_through_the_app_are_summarised(tmp_path, monkeypatch):
         msg = [m for m in app.session_state["messages"] if m["role"] == "assistant"][0]
         app.button(key=f"{react}_{msg['turn_id']}").click().run()
         app.button(key="task_done").click().run()
+        app.text_area(key="reason_text").input("It sounded wrong for a friend" if react == "flag" else "Fine")
+        next(b for b in app.button if b.label == "Continue →").click().run()
         app.radio(key="fit_m2").set_value("no" if react == "flag" else "yes")
         next(b for b in app.button if b.label == "Next task →").click().run()
         app.button(key="finish_session").click().run()
