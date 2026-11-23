@@ -57,6 +57,13 @@ def truth_for(scenario_id: str | None) -> dict | None:
     return None if s is None else _truth(s)
 
 
+def carries_from(scenario_id: str) -> str | None:
+    """The task whose end state a follow-up task keeps (data/replay.json, evaluation_carry_over).
+    Every other task starts from the seeded memories."""
+    data = json.loads(REPLAY_PATH.read_text(encoding="utf-8"))
+    return (data.get("evaluation_carry_over") or {}).get(scenario_id)
+
+
 def evaluation_schedule() -> list[str]:
     """The scenario ids evaluation mode serves, in order (data/replay.json, evaluation_schedule).
     MPA_EVAL_SCHEDULE="S3-birthday,S1-dinner" overrides it; unknown ids are an error."""

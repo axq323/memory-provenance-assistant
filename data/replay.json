@@ -7,6 +7,10 @@
     "S4-work-email",
     "S2-explain"
   ],
+  "_note_carry_over": "Memory state between tasks: every task starts from the seeded memories (data/memories.seed.json), so a correction made in one task can't change what a later task shows. The one exception is listed here on purpose: the work email keeps the memories as the birthday task left them, to show whether that correction kept the formal tone where it fits.",
+  "evaluation_carry_over": {
+    "S4-work-email": "S3-birthday"
+  },
   "scenarios": [
     {
       "id": "S1-dinner",

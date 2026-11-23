@@ -23,7 +23,7 @@ EVENTS = {
     "reply_shown", "source_opened", "source_closed", "not_for_task", "undo_not_for_task",
     "memory_edited", "memory_forgotten", "reply_accepted", "reply_flagged", "demo_reset",
     "influence_checked", "chat_cleared", "prediction_made", "task_finished", "fit_judged",
-    "questionnaire_answered", "session_finished", "session_started", "reason_given",
+    "questionnaire_answered", "session_finished", "session_started", "reason_given", "task_started",
 }
 
 

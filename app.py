@@ -21,7 +21,7 @@ from mpa.display import tame_headings  # noqa: E402
 from mpa.interaction_log import log_event, read_log  # noqa: E402
 from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
 from mpa.memory_store import MemoryStore  # noqa: E402
-from mpa.evaluation import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, clean_comment,  # noqa: E402
+from mpa.evaluation import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, carries_from, clean_comment,  # noqa: E402
                             correction_actions, correction_outcome, evaluation_schedule, final_state,
                             scenario, truth_for,
                             reliance, score_fit, score_prediction, summarise_task)
@@ -133,14 +133,25 @@ def log(event: str, trial_id: str | None = None, **kw) -> None:
 # -------------------------------------------------------------- actions ---
 def history_before(index: int) -> list[dict]:
     """Chat history for a new prompt. A reply that was later regenerated (after
-    'Not for ...') is left out, so a corrected reply can't leak into new ones."""
-    superseded = {m.get("regenerated_from") for m in ss.messages if m.get("regenerated_from")}
+    'Not for ...') is replaced by its latest rewrite IN ITS OWN PLACE, right after the
+    request it answers, so a corrected reply can't leak into new ones and a rewrite of an
+    older reply isn't sent after newer turns. (The chat shows the rewrite at the bottom,
+    where it was made; the model sees the conversation in order.)"""
+    shown = ss.messages[:index]
+    rewrite_of = {m["regenerated_from"]: m for m in shown
+                  if m["role"] == "assistant" and m.get("regenerated_from")}   # a later rewrite wins
+
+    def latest(m: dict) -> dict:
+        while m["turn_id"] in rewrite_of:                 # follows rewrites of rewrites
+            m = rewrite_of[m["turn_id"]]
+        return m
+
     hist = []
-    for m in ss.messages[:index]:
+    for m in shown:
         if m["role"] == "user":
             hist.append({"role": "user", "content": m["text"]})
-        elif m["role"] == "assistant" and m["turn_id"] not in superseded:
-            hist.append({"role": "assistant", "content": m["reply"].answer})
+        elif m["role"] == "assistant" and not m.get("regenerated_from"):
+            hist.append({"role": "assistant", "content": latest(m)["reply"].answer})
     return hist
 
 
@@ -306,10 +317,22 @@ def next_scenario() -> str | None:
     return next((sid for sid in ss.eval_schedule if sid not in ss.trials_done), None)
 
 
+def keeps_previous_memories(scenario_id: str) -> bool:
+    """A follow-up task (data/replay.json, evaluation_carry_over) keeps the memories as the
+    task it follows left them, if that task was the one just finished."""
+    source = carries_from(scenario_id)
+    return bool(source) and bool(ss.trials_done) and ss.trials_done[-1] == source
+
+
 def start_task(scenario_id: str) -> None:
-    """Evaluation mode: put the scheduled prompt in the chat and ask for a prediction."""
+    """Evaluation mode: start from the original memories (unless this is a declared follow-up),
+    put the scheduled prompt in the chat and ask for a prediction."""
     if ss.eval_task is not None or ss.awaiting_prediction or scenario_id != next_scenario():
         return
+    carried = keeps_previous_memories(scenario_id)
+    if not carried:
+        store.reset()      # every independent task starts from the same seeded memories
+    log("task_started", detail=f"scenario={scenario_id};memories={'carried' if carried else 'reset'}")
     prompt = scenario(scenario_id)["prompt"]
     ss.messages.append({"role": "user", "text": prompt})
     ss.awaiting_prediction = prompt
@@ -662,11 +685,10 @@ def render_memory_panel() -> None:
         key = f"panel:{mem['id']}"
         with st.container(border=True):
             st.markdown(mem["text"] + ("  _(edited)_" if mem.get("edited") else ""))
-            src = store.source_for(mem["id"])
-            if SHOW_SOURCES and src:
-                st.caption(f"From {src['title']} · {src['date']}")
-            else:
-                st.caption(f"Saved {mem['created']}")
+            # The same line in both settings. In setting A the conversation's title and turns
+            # appear only once the user opens the source, so what differs between A and B is
+            # access to the source, not a title that is always on screen.
+            st.caption(f"Saved {mem['created']}")
             for task in mem["excluded_tasks"]:
                 st.caption(f"⛔ Not used for {label(task)}")
                 if active:
@@ -898,6 +920,10 @@ def render_session_end() -> None:
                 n = len(ss.trials_done) + 1
                 st.markdown(f"**Task {n} of {total}.** Imagine you're asking your assistant this:")
                 st.markdown(f"> {scenario(upcoming)['prompt']}")
+                st.caption("This task keeps any changes you made to your memories in the last task."
+                           if keeps_previous_memories(upcoming) else
+                           "Each task starts from your original memories, so changes from earlier tasks "
+                           "are undone when it starts.")
                 st.button(f"Start task {n} of {total} →", key="start_task", type="primary",
                           on_click=start_task, args=(upcoming,))
             else:

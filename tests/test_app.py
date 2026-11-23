@@ -476,9 +476,16 @@ def test_opening_a_source_is_counted_as_checking_effort(app, tmp_path):
 
 
 def test_no_fit_question_when_no_memory_was_used(app, tmp_path):
-    app.selectbox(key="nft_pick_m2").set_value("personal_message").run()      # m2 restricted beforehand
-    app.button(key="nft_apply_m2").click().run()
-    msg = _start_task(app, "Can you write a birthday message", [])
+    # the work email after the formal-tone memory was forgotten in the birthday task
+    _evaluation(app)
+    _schedule(app, "S3-birthday", "S4-work-email")
+    birthday = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"forget_{birthday['turn_id']}:m2").click().run()
+    app.button(key="task_done").click().run()
+    _reason(app)
+    app.radio(key="fit_m2").set_value("no")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    msg = _next_task(app, "Write an email to my manager", [])
     assert msg["reply"].used == []
     app.button(key="task_done").click().run()
     assert not app.exception
@@ -945,3 +952,80 @@ def test_after_forgetting_instead_the_work_email_loses_the_formal_tone(app):
     next(b for b in app.button if b.label == "Next task →").click().run()
     work = _next_task(app, "Write an email to my manager", [])
     assert work["reply"].used == [] and work["reply"].answer.startswith("**Subject:** Friday afternoon?")
+
+
+# ------------------------------------------------- stage 9 ---
+def test_a_rewrite_of_an_older_reply_keeps_its_place_in_the_history(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    app.chat_input[0].set_value(DINNER).run()
+    first = _assistant(app)[0]
+    app.button(key=f"nft_{first['turn_id']}:m1").click().run()           # rewrite the OLDER reply
+    redo = _assistant(app)[-1]
+    app.chat_input[0].set_value(BIRTHDAY).run()
+    hist = _assistant(app)[-1]["history"]
+    assert [h["role"] for h in hist] == ["user", "assistant", "user", "assistant"]
+    assert hist[0]["content"] == EXPLAIN and hist[1]["content"] == redo["reply"].answer
+    assert hist[2]["content"] == DINNER
+
+
+def test_a_rewrite_of_a_rewrite_replaces_the_original_once(app):
+    app.chat_input[0].set_value(EXPLAIN).run()
+    first = _assistant(app)[0]
+    app.button(key=f"nft_{first['turn_id']}:m1").click().run()
+    second = _assistant(app)[-1]
+    app.button(key=f"nft_{second['turn_id']}:m2").click().run()
+    third = _assistant(app)[-1]
+    assert third["regenerated_from"] == second["turn_id"]
+    app.chat_input[0].set_value(DINNER).run()
+    hist = _assistant(app)[-1]["history"]
+    assert hist == [{"role": "user", "content": EXPLAIN},
+                    {"role": "assistant", "content": third["reply"].answer}]
+
+
+def test_each_task_starts_from_the_original_memories(app, tmp_path):
+    _evaluation(app)
+    _schedule(app, "S1-dinner", "S2-explain")
+    _start_task(app, "Can you suggest something I could make", ["m3", "m4"])
+    app.selectbox(key="nft_pick_m1").set_value("explain").run()          # pre-empts the next task
+    app.button(key="nft_apply_m1").click().run()
+    app.button(key="task_done").click().run()
+    _reason(app)
+    app.radio(key="fit_m3").set_value("yes")
+    app.radio(key="fit_m4").set_value("yes")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    assert any("starts from your original memories" in c.value for c in app.caption)
+    msg = _next_task(app, "I don't really understand", ["m1"])
+    assert {u["id"] for u in msg["reply"].used} == {"m1"}                  # the misapplication is still shown
+    started = [r["detail"] for r in _rows(app, tmp_path) if r["event"] == "task_started"]
+    assert started == ["scenario=S1-dinner;memories=reset", "scenario=S2-explain;memories=reset"]
+
+
+def test_the_work_email_keeps_the_birthday_tasks_changes(app, tmp_path):
+    _evaluation(app)
+    _schedule(app, "S3-birthday", "S4-work-email")
+    birthday = _start_task(app, "Can you write a birthday message", ["m2"])
+    app.button(key=f"nft_{birthday['turn_id']}:m2").click().run()
+    app.button(key="task_done").click().run()
+    _reason(app)
+    app.radio(key="fit_m2").set_value("no")
+    next(b for b in app.button if b.label == "Next task →").click().run()
+    assert any("keeps any changes you made" in c.value for c in app.caption)
+    _next_task(app, "Write an email to my manager", ["m2"])
+    assert "personal_message" in app.session_state["eval_task"]["stimulus"]["m2"]["excluded_tasks"]
+    assert "scenario=S4-work-email;memories=carried" in _log(tmp_path)
+
+
+def test_the_work_email_resets_when_it_does_not_follow_the_birthday_task(app, tmp_path):
+    _evaluation(app)
+    _schedule(app, "S1-dinner", "S4-work-email")
+    _finish_dinner(app)
+    msg = _next_task(app, "Write an email to my manager", ["m2"])
+    assert "scenario=S4-work-email;memories=reset" in _log(tmp_path)
+    assert {u["id"] for u in msg["reply"].used} == {"m2"}
+
+
+def test_source_titles_appear_only_when_the_source_is_opened(app):
+    titles = ("Work email: asking my manager", "Essay revision", "Dinner ideas for the week")
+    assert not any(t in c.value for c in app.caption for t in titles)    # setting A, nothing opened
+    app.button(key="src_panel:m2").click().run()
+    assert any("Work email: asking my manager" in c.value for c in app.caption)
