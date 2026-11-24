@@ -1,0 +1,5 @@
+session,condition,mode,complete,tasks,prediction_exact,prediction_overlap,fit_accuracy,fit_unsure,misapplied_judged_unsuitable,scope_named,correction_scoped,correction_forgot,reliance_appropriate,over_reliance,under_reliance,no_decision,unrelated_correction,sources_per_task,seconds_per_task,q_trust,q_understanding,q_predictability,q_control,q_effort,q_comfort
+4e7ee0,A,replay,False,1,0.0,0.0,1.0,0.0,1.0,,,,1.0,0.0,,0.0,0.0,1,97,,,,,,
+6bb86f,A,live,False,0,0.0,0.0,,,,,,,,,,,,,,,,,,,
+b8c510,A,replay,True,1,0.0,0.0,1.0,0.0,1.0,,,,1.0,0.0,,0.0,0.0,0,39,2,2,1,3,7,7
+c778fe,B,replay,False,1,0.0,0.0,1.0,0.0,,,,,,,,1.0,0.0,0,7,,,,,,

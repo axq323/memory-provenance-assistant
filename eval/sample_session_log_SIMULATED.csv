@@ -1,133 +1,149 @@
 timestamp,session_id,condition,mode,turn_id,task,event,memory_id,detail,trial_id
-2026-11-23T04:15:12,0c5a0a,B,replay,,,session_started,,condition=B,
-2026-11-23T04:15:12,0c5a0a,B,replay,5e3773d0,cooking,reply_shown,,"used=m3,m4",trial1
-2026-11-23T04:15:12,0c5a0a,B,replay,5e3773d0,cooking,prediction_made,,"predicted=m4;used=m3,m4;exact=False;jaccard=0.5;scenario=S1-dinner",trial1
-2026-11-23T04:15:12,0c5a0a,B,replay,5e3773d0,cooking,reply_flagged,,"used=m3,m4",trial1
-2026-11-23T04:15:12,0c5a0a,B,replay,5e3773d0,cooking,task_finished,,"scenario=S1-dinner;decision=flagged;accepted=False;flagged=True;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=under-reliance;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
-2026-11-23T04:15:12,0c5a0a,B,replay,5e3773d0,cooking,reason_given,,text=Not sure why it picked that.,trial1
-2026-11-23T04:15:12,0c5a0a,B,replay,5e3773d0,cooking,fit_judged,m3,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
-2026-11-23T04:15:12,0c5a0a,B,replay,5e3773d0,cooking,fit_judged,m4,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
-2026-11-23T04:15:12,0c5a0a,B,replay,4e22e4c4,personal_message,reply_shown,,used=m2,trial2
-2026-11-23T04:15:12,0c5a0a,B,replay,4e22e4c4,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
-2026-11-23T04:15:12,0c5a0a,B,replay,4e22e4c4,personal_message,not_for_task,m2,,trial2
-2026-11-23T04:15:13,0c5a0a,B,replay,ead99b22,personal_message,reply_shown,,used=,trial2
-2026-11-23T04:15:13,0c5a0a,B,replay,4e22e4c4,personal_message,task_finished,,scenario=S3-birthday;decision=corrected;accepted=False;flagged=False;corrected=m2;sources_opened=0;seconds=1;misapplied_shown=m2;reliance=appropriate;actions=restrict:m2@personal_message;final=m2:restricted;correction=scoped,trial2
-2026-11-23T04:15:13,0c5a0a,B,replay,4e22e4c4,personal_message,reason_given,,text=Way too formal for Sam.,trial2
-2026-11-23T04:15:13,0c5a0a,B,replay,4e22e4c4,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday,trial2
-2026-11-23T04:15:13,0c5a0a,B,replay,b216d4e2,work_writing,reply_shown,,used=m2,trial3
-2026-11-23T04:15:13,0c5a0a,B,replay,b216d4e2,work_writing,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
-2026-11-23T04:15:13,0c5a0a,B,replay,b216d4e2,work_writing,reply_accepted,,used=m2,trial3
-2026-11-23T04:15:13,0c5a0a,B,replay,b216d4e2,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=appropriate;actions=none;final=m2:unchanged;correction=none,trial3
-2026-11-23T04:15:13,0c5a0a,B,replay,b216d4e2,work_writing,reason_given,,text=Fine for my manager.,trial3
-2026-11-23T04:15:13,0c5a0a,B,replay,b216d4e2,work_writing,fit_judged,m2,answer=yes;truth=fits;correct=True;scenario=S4-work-email,trial3
-2026-11-23T04:15:13,0c5a0a,B,replay,38e3cd45,explain,reply_shown,,used=m1,trial4
-2026-11-23T04:15:13,0c5a0a,B,replay,38e3cd45,explain,prediction_made,,predicted=m1;used=m1;exact=True;jaccard=1.0;scenario=S2-explain,trial4
-2026-11-23T04:15:13,0c5a0a,B,replay,38e3cd45,explain,task_finished,,scenario=S2-explain;decision=none;accepted=False;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=m1;reliance=no decision;actions=none;final=m1:unchanged;correction=none,trial4
-2026-11-23T04:15:13,0c5a0a,B,replay,38e3cd45,explain,reason_given,,text=Didn't really think about it.,trial4
-2026-11-23T04:15:14,0c5a0a,B,replay,38e3cd45,explain,fit_judged,m1,answer=no;truth=misapplied;correct=True;scenario=S2-explain,trial4
-2026-11-23T04:15:14,0c5a0a,B,replay,,,questionnaire_answered,,item=trust;score=4;reverse=False,
-2026-11-23T04:15:14,0c5a0a,B,replay,,,questionnaire_answered,,item=understanding;score=4;reverse=False,
-2026-11-23T04:15:14,0c5a0a,B,replay,,,questionnaire_answered,,item=predictability;score=4;reverse=False,
-2026-11-23T04:15:14,0c5a0a,B,replay,,,questionnaire_answered,,item=control;score=4;reverse=False,
-2026-11-23T04:15:14,0c5a0a,B,replay,,,questionnaire_answered,,item=effort;score=4;reverse=True,
-2026-11-23T04:15:14,0c5a0a,B,replay,,,questionnaire_answered,,item=comfort;score=4;reverse=False,
-2026-11-23T04:15:14,0c5a0a,B,replay,,,session_finished,,tasks=4;scheduled=4,
-2026-11-23T04:15:08,318f33,A,replay,,,session_started,,condition=A,
-2026-11-23T04:15:08,318f33,A,replay,982e90f1,cooking,reply_shown,,"used=m3,m4",trial1
-2026-11-23T04:15:08,318f33,A,replay,982e90f1,cooking,prediction_made,,"predicted=m3;used=m3,m4;exact=False;jaccard=0.5;scenario=S1-dinner",trial1
-2026-11-23T04:15:09,318f33,A,replay,982e90f1,cooking,reply_accepted,,"used=m3,m4",trial1
-2026-11-23T04:15:09,318f33,A,replay,982e90f1,cooking,task_finished,,"scenario=S1-dinner;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=1;misapplied_shown=none;reliance=appropriate;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
-2026-11-23T04:15:09,318f33,A,replay,982e90f1,cooking,reason_given,,text=Looked good.,trial1
-2026-11-23T04:15:09,318f33,A,replay,982e90f1,cooking,fit_judged,m3,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
-2026-11-23T04:15:09,318f33,A,replay,982e90f1,cooking,fit_judged,m4,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
-2026-11-23T04:15:09,318f33,A,replay,46c73a2f,personal_message,reply_shown,,used=m2,trial2
-2026-11-23T04:15:09,318f33,A,replay,46c73a2f,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
-2026-11-23T04:15:09,318f33,A,replay,46c73a2f,,memory_forgotten,m2,,trial2
-2026-11-23T04:15:09,318f33,A,replay,46c73a2f,personal_message,task_finished,,scenario=S3-birthday;decision=corrected;accepted=False;flagged=False;corrected=m2;sources_opened=0;seconds=0;misapplied_shown=m2;reliance=appropriate;actions=forget:m2;final=m2:forgotten;correction=forgot,trial2
-2026-11-23T04:15:09,318f33,A,replay,46c73a2f,personal_message,reason_given,,text=I don't want it to write formally.,trial2
-2026-11-23T04:15:09,318f33,A,replay,46c73a2f,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday,trial2
-2026-11-23T04:15:09,318f33,A,replay,bb7b077f,work_writing,reply_shown,,used=,trial3
-2026-11-23T04:15:09,318f33,A,replay,bb7b077f,work_writing,prediction_made,,predicted=none;used=none;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
-2026-11-23T04:15:09,318f33,A,replay,bb7b077f,work_writing,reply_accepted,,used=,trial3
-2026-11-23T04:15:09,318f33,A,replay,bb7b077f,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=n/a;actions=none;final=none;correction=n/a,trial3
-2026-11-23T04:15:10,318f33,A,replay,08de27a6,explain,reply_shown,,used=m1,trial4
-2026-11-23T04:15:10,318f33,A,replay,08de27a6,explain,prediction_made,,predicted=none;used=m1;exact=False;jaccard=0.0;scenario=S2-explain,trial4
-2026-11-23T04:15:10,318f33,A,replay,08de27a6,explain,reply_accepted,,used=m1,trial4
-2026-11-23T04:15:10,318f33,A,replay,08de27a6,explain,task_finished,,scenario=S2-explain;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=m1;reliance=over-reliance;actions=none;final=m1:unchanged;correction=none,trial4
-2026-11-23T04:15:10,318f33,A,replay,08de27a6,explain,reason_given,,"text=It answered the question, I suppose.",trial4
-2026-11-23T04:15:10,318f33,A,replay,08de27a6,explain,fit_judged,m1,answer=yes;truth=misapplied;correct=False;scenario=S2-explain,trial4
-2026-11-23T04:15:10,318f33,A,replay,,,questionnaire_answered,,item=trust;score=3;reverse=False,
-2026-11-23T04:15:10,318f33,A,replay,,,questionnaire_answered,,item=understanding;score=3;reverse=False,
-2026-11-23T04:15:10,318f33,A,replay,,,questionnaire_answered,,item=predictability;score=3;reverse=False,
-2026-11-23T04:15:10,318f33,A,replay,,,questionnaire_answered,,item=control;score=3;reverse=False,
-2026-11-23T04:15:10,318f33,A,replay,,,questionnaire_answered,,item=effort;score=3;reverse=True,
-2026-11-23T04:15:10,318f33,A,replay,,,questionnaire_answered,,item=comfort;score=3;reverse=False,
-2026-11-23T04:15:10,318f33,A,replay,,,session_finished,,tasks=4;scheduled=4,
-2026-11-23T04:15:06,5ebd7f,A,replay,,,session_started,,condition=A,
-2026-11-23T04:15:06,5ebd7f,A,replay,b7113210,cooking,reply_shown,,"used=m3,m4",trial1
-2026-11-23T04:15:06,5ebd7f,A,replay,b7113210,cooking,prediction_made,,"predicted=m3,m4;used=m3,m4;exact=True;jaccard=1.0;scenario=S1-dinner",trial1
-2026-11-23T04:15:06,5ebd7f,A,replay,b7113210,cooking,reply_accepted,,"used=m3,m4",trial1
-2026-11-23T04:15:07,5ebd7f,A,replay,b7113210,cooking,task_finished,,"scenario=S1-dinner;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=1;misapplied_shown=none;reliance=appropriate;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
-2026-11-23T04:15:07,5ebd7f,A,replay,b7113210,cooking,reason_given,,"text=Vegetarian and quick, that's what I need.",trial1
-2026-11-23T04:15:07,5ebd7f,A,replay,b7113210,cooking,fit_judged,m3,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
-2026-11-23T04:15:07,5ebd7f,A,replay,b7113210,cooking,fit_judged,m4,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
-2026-11-23T04:15:07,5ebd7f,A,replay,a2c18056,personal_message,reply_shown,,used=m2,trial2
-2026-11-23T04:15:07,5ebd7f,A,replay,a2c18056,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
-2026-11-23T04:15:07,5ebd7f,A,replay,a2c18056,personal_message,not_for_task,m2,,trial2
-2026-11-23T04:15:07,5ebd7f,A,replay,7d268325,personal_message,reply_shown,,used=,trial2
-2026-11-23T04:15:07,5ebd7f,A,replay,a2c18056,personal_message,task_finished,,scenario=S3-birthday;decision=corrected;accepted=False;flagged=False;corrected=m2;sources_opened=0;seconds=0;misapplied_shown=m2;reliance=appropriate;actions=restrict:m2@personal_message;final=m2:restricted;correction=scoped,trial2
-2026-11-23T04:15:07,5ebd7f,A,replay,a2c18056,personal_message,reason_given,,"text=Formal is right for work, not for a friend.",trial2
-2026-11-23T04:15:07,5ebd7f,A,replay,a2c18056,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday,trial2
-2026-11-23T04:15:07,5ebd7f,A,replay,0727e45f,work_writing,reply_shown,,used=m2,trial3
-2026-11-23T04:15:07,5ebd7f,A,replay,0727e45f,work_writing,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
-2026-11-23T04:15:07,5ebd7f,A,replay,0727e45f,work_writing,reply_accepted,,used=m2,trial3
-2026-11-23T04:15:07,5ebd7f,A,replay,0727e45f,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=appropriate;actions=none;final=m2:unchanged;correction=none,trial3
-2026-11-23T04:15:07,5ebd7f,A,replay,0727e45f,work_writing,reason_given,,"text=It's going to my manager, so formal is fine.",trial3
-2026-11-23T04:15:08,5ebd7f,A,replay,0727e45f,work_writing,fit_judged,m2,answer=yes;truth=fits;correct=True;scenario=S4-work-email,trial3
-2026-11-23T04:15:08,5ebd7f,A,replay,9442560d,explain,reply_shown,,used=m1,trial4
-2026-11-23T04:15:08,5ebd7f,A,replay,9442560d,explain,prediction_made,,predicted=m1;used=m1;exact=True;jaccard=1.0;scenario=S2-explain,trial4
-2026-11-23T04:15:08,5ebd7f,A,replay,9442560d,explain,not_for_task,m1,,trial4
-2026-11-23T04:15:08,5ebd7f,A,replay,d181e836,explain,reply_shown,,used=,trial4
-2026-11-23T04:15:08,5ebd7f,A,replay,9442560d,explain,task_finished,,scenario=S2-explain;decision=corrected;accepted=False;flagged=False;corrected=m1;sources_opened=0;seconds=0;misapplied_shown=m1;reliance=appropriate;actions=restrict:m1@explain;final=m1:restricted;correction=scoped,trial4
-2026-11-23T04:15:08,5ebd7f,A,replay,9442560d,explain,reason_given,,"text=I asked for a proper explanation, not a summary.",trial4
-2026-11-23T04:15:08,5ebd7f,A,replay,9442560d,explain,fit_judged,m1,answer=no;truth=misapplied;correct=True;scenario=S2-explain,trial4
-2026-11-23T04:15:08,5ebd7f,A,replay,,,questionnaire_answered,,item=trust;score=6;reverse=False,
-2026-11-23T04:15:08,5ebd7f,A,replay,,,questionnaire_answered,,item=understanding;score=6;reverse=False,
-2026-11-23T04:15:08,5ebd7f,A,replay,,,questionnaire_answered,,item=predictability;score=6;reverse=False,
-2026-11-23T04:15:08,5ebd7f,A,replay,,,questionnaire_answered,,item=control;score=6;reverse=False,
-2026-11-23T04:15:08,5ebd7f,A,replay,,,questionnaire_answered,,item=effort;score=6;reverse=True,
-2026-11-23T04:15:08,5ebd7f,A,replay,,,questionnaire_answered,,item=comfort;score=6;reverse=False,
-2026-11-23T04:15:08,5ebd7f,A,replay,,,session_finished,,tasks=4;scheduled=4,
-2026-11-23T04:15:10,7c1f63,B,replay,,,session_started,,condition=B,
-2026-11-23T04:15:10,7c1f63,B,replay,e9799f15,cooking,reply_shown,,"used=m3,m4",trial1
-2026-11-23T04:15:10,7c1f63,B,replay,e9799f15,cooking,prediction_made,,"predicted=m3,m4;used=m3,m4;exact=True;jaccard=1.0;scenario=S1-dinner",trial1
-2026-11-23T04:15:10,7c1f63,B,replay,e9799f15,cooking,reply_accepted,,"used=m3,m4",trial1
-2026-11-23T04:15:10,7c1f63,B,replay,e9799f15,cooking,task_finished,,"scenario=S1-dinner;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=appropriate;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
-2026-11-23T04:15:10,7c1f63,B,replay,e9799f15,cooking,reason_given,,text=It matched what I asked.,trial1
-2026-11-23T04:15:10,7c1f63,B,replay,e9799f15,cooking,fit_judged,m3,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
-2026-11-23T04:15:10,7c1f63,B,replay,e9799f15,cooking,fit_judged,m4,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
-2026-11-23T04:15:11,7c1f63,B,replay,2b2b0da1,personal_message,reply_shown,,used=m2,trial2
-2026-11-23T04:15:11,7c1f63,B,replay,2b2b0da1,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
-2026-11-23T04:15:11,7c1f63,B,replay,2b2b0da1,personal_message,reply_accepted,,used=m2,trial2
-2026-11-23T04:15:11,7c1f63,B,replay,2b2b0da1,personal_message,task_finished,,scenario=S3-birthday;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=m2;reliance=over-reliance;actions=none;final=m2:unchanged;correction=none,trial2
-2026-11-23T04:15:11,7c1f63,B,replay,2b2b0da1,personal_message,reason_given,,"text=It was a birthday message, so it did the job.",trial2
-2026-11-23T04:15:11,7c1f63,B,replay,2b2b0da1,personal_message,fit_judged,m2,answer=yes;truth=misapplied;correct=False;scenario=S3-birthday,trial2
-2026-11-23T04:15:11,7c1f63,B,replay,84b5c090,work_writing,reply_shown,,used=m2,trial3
-2026-11-23T04:15:11,7c1f63,B,replay,84b5c090,work_writing,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
-2026-11-23T04:15:11,7c1f63,B,replay,84b5c090,work_writing,reply_accepted,,used=m2,trial3
-2026-11-23T04:15:11,7c1f63,B,replay,84b5c090,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=appropriate;actions=none;final=m2:unchanged;correction=none,trial3
-2026-11-23T04:15:11,7c1f63,B,replay,84b5c090,work_writing,reason_given,,text=Good for work.,trial3
-2026-11-23T04:15:11,7c1f63,B,replay,84b5c090,work_writing,fit_judged,m2,answer=yes;truth=fits;correct=True;scenario=S4-work-email,trial3
-2026-11-23T04:15:11,7c1f63,B,replay,8ecf8b9c,explain,reply_shown,,used=m1,trial4
-2026-11-23T04:15:11,7c1f63,B,replay,8ecf8b9c,explain,prediction_made,,predicted=m1;used=m1;exact=True;jaccard=1.0;scenario=S2-explain,trial4
-2026-11-23T04:15:11,7c1f63,B,replay,8ecf8b9c,explain,reply_flagged,,used=m1,trial4
-2026-11-23T04:15:12,7c1f63,B,replay,8ecf8b9c,explain,task_finished,,scenario=S2-explain;decision=flagged;accepted=False;flagged=True;corrected=none;sources_opened=0;seconds=1;misapplied_shown=m1;reliance=appropriate;actions=none;final=m1:unchanged;correction=none,trial4
-2026-11-23T04:15:12,7c1f63,B,replay,8ecf8b9c,explain,reason_given,,text=It felt a bit thin for a step-by-step question.,trial4
-2026-11-23T04:15:12,7c1f63,B,replay,8ecf8b9c,explain,fit_judged,m1,answer=no;truth=misapplied;correct=True;scenario=S2-explain,trial4
-2026-11-23T04:15:12,7c1f63,B,replay,,,questionnaire_answered,,item=trust;score=5;reverse=False,
-2026-11-23T04:15:12,7c1f63,B,replay,,,questionnaire_answered,,item=understanding;score=5;reverse=False,
-2026-11-23T04:15:12,7c1f63,B,replay,,,questionnaire_answered,,item=predictability;score=5;reverse=False,
-2026-11-23T04:15:12,7c1f63,B,replay,,,questionnaire_answered,,item=control;score=5;reverse=False,
-2026-11-23T04:15:12,7c1f63,B,replay,,,questionnaire_answered,,item=effort;score=5;reverse=True,
-2026-11-23T04:15:12,7c1f63,B,replay,,,questionnaire_answered,,item=comfort;score=5;reverse=False,
-2026-11-23T04:15:12,7c1f63,B,replay,,,session_finished,,tasks=4;scheduled=4,
+2026-11-25T02:23:04,07ba7c,B,replay,,,session_started,,condition=B,
+2026-11-25T02:23:04,07ba7c,B,replay,,,task_started,,scenario=S1-dinner;memories=reset,
+2026-11-25T02:23:04,07ba7c,B,replay,7832e09a,cooking,reply_shown,,"used=m3,m4",trial1
+2026-11-25T02:23:04,07ba7c,B,replay,7832e09a,cooking,prediction_made,,"predicted=m4;used=m3,m4;exact=False;jaccard=0.5;scenario=S1-dinner",trial1
+2026-11-25T02:23:04,07ba7c,B,replay,7832e09a,cooking,reply_flagged,,"used=m3,m4",trial1
+2026-11-25T02:23:04,07ba7c,B,replay,7832e09a,cooking,task_finished,,"scenario=S1-dinner;decision=flagged;accepted=False;flagged=True;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=under-reliance;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
+2026-11-25T02:23:04,07ba7c,B,replay,7832e09a,cooking,reason_given,,text=Not sure why it picked that.,trial1
+2026-11-25T02:23:05,07ba7c,B,replay,7832e09a,cooking,fit_judged,m3,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
+2026-11-25T02:23:05,07ba7c,B,replay,7832e09a,cooking,fit_judged,m4,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
+2026-11-25T02:23:05,07ba7c,B,replay,,,task_started,,scenario=S3-birthday;memories=reset,
+2026-11-25T02:23:05,07ba7c,B,replay,582ed5e5,personal_message,reply_shown,,used=m2,trial2
+2026-11-25T02:23:05,07ba7c,B,replay,582ed5e5,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
+2026-11-25T02:23:05,07ba7c,B,replay,582ed5e5,personal_message,not_for_task,m2,,trial2
+2026-11-25T02:23:05,07ba7c,B,replay,77df211e,personal_message,reply_shown,,used=,trial2
+2026-11-25T02:23:05,07ba7c,B,replay,582ed5e5,personal_message,task_finished,,scenario=S3-birthday;decision=corrected;accepted=False;flagged=False;corrected=m2;sources_opened=0;seconds=0;misapplied_shown=m2;reliance=appropriate;actions=restrict:m2@personal_message;final=m2:restricted;correction=scoped,trial2
+2026-11-25T02:23:06,07ba7c,B,replay,582ed5e5,personal_message,reason_given,,text=Way too formal for Sam.,trial2
+2026-11-25T02:23:06,07ba7c,B,replay,582ed5e5,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday,trial2
+2026-11-25T02:23:06,07ba7c,B,replay,,,task_started,,scenario=S4-work-email;memories=carried,
+2026-11-25T02:23:06,07ba7c,B,replay,f708aad1,work_writing,reply_shown,,used=m2,trial3
+2026-11-25T02:23:06,07ba7c,B,replay,f708aad1,work_writing,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
+2026-11-25T02:23:07,07ba7c,B,replay,f708aad1,work_writing,reply_accepted,,used=m2,trial3
+2026-11-25T02:23:07,07ba7c,B,replay,f708aad1,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=1;misapplied_shown=none;reliance=appropriate;actions=none;final=m2:unchanged;correction=none,trial3
+2026-11-25T02:23:07,07ba7c,B,replay,f708aad1,work_writing,reason_given,,text=Fine for my manager.,trial3
+2026-11-25T02:23:07,07ba7c,B,replay,f708aad1,work_writing,fit_judged,m2,answer=yes;truth=fits;correct=True;scenario=S4-work-email,trial3
+2026-11-25T02:23:07,07ba7c,B,replay,,,task_started,,scenario=S2-explain;memories=reset,
+2026-11-25T02:23:08,07ba7c,B,replay,a4daf603,explain,reply_shown,,used=m1,trial4
+2026-11-25T02:23:08,07ba7c,B,replay,a4daf603,explain,prediction_made,,predicted=m1;used=m1;exact=True;jaccard=1.0;scenario=S2-explain,trial4
+2026-11-25T02:23:08,07ba7c,B,replay,a4daf603,explain,task_finished,,scenario=S2-explain;decision=none;accepted=False;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=m1;reliance=no decision;actions=none;final=m1:unchanged;correction=none,trial4
+2026-11-25T02:23:08,07ba7c,B,replay,a4daf603,explain,reason_given,,text=Didn't really think about it.,trial4
+2026-11-25T02:23:08,07ba7c,B,replay,a4daf603,explain,fit_judged,m1,answer=no;truth=misapplied;correct=True;scenario=S2-explain,trial4
+2026-11-25T02:23:09,07ba7c,B,replay,,,questionnaire_answered,,item=trust;score=4;reverse=False,
+2026-11-25T02:23:09,07ba7c,B,replay,,,questionnaire_answered,,item=understanding;score=4;reverse=False,
+2026-11-25T02:23:09,07ba7c,B,replay,,,questionnaire_answered,,item=predictability;score=4;reverse=False,
+2026-11-25T02:23:09,07ba7c,B,replay,,,questionnaire_answered,,item=control;score=4;reverse=False,
+2026-11-25T02:23:09,07ba7c,B,replay,,,questionnaire_answered,,item=effort;score=4;reverse=True,
+2026-11-25T02:23:09,07ba7c,B,replay,,,questionnaire_answered,,item=comfort;score=4;reverse=False,
+2026-11-25T02:23:09,07ba7c,B,replay,,,session_finished,,tasks=4;scheduled=4,
+2026-11-25T02:23:00,690949,B,replay,,,session_started,,condition=B,
+2026-11-25T02:23:00,690949,B,replay,,,task_started,,scenario=S1-dinner;memories=reset,
+2026-11-25T02:23:00,690949,B,replay,595799c3,cooking,reply_shown,,"used=m3,m4",trial1
+2026-11-25T02:23:00,690949,B,replay,595799c3,cooking,prediction_made,,"predicted=m3,m4;used=m3,m4;exact=True;jaccard=1.0;scenario=S1-dinner",trial1
+2026-11-25T02:23:00,690949,B,replay,595799c3,cooking,reply_accepted,,"used=m3,m4",trial1
+2026-11-25T02:23:00,690949,B,replay,595799c3,cooking,task_finished,,"scenario=S1-dinner;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=appropriate;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
+2026-11-25T02:23:01,690949,B,replay,595799c3,cooking,reason_given,,text=It matched what I asked.,trial1
+2026-11-25T02:23:01,690949,B,replay,595799c3,cooking,fit_judged,m3,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
+2026-11-25T02:23:01,690949,B,replay,595799c3,cooking,fit_judged,m4,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
+2026-11-25T02:23:01,690949,B,replay,,,task_started,,scenario=S3-birthday;memories=reset,
+2026-11-25T02:23:01,690949,B,replay,80acc429,personal_message,reply_shown,,used=m2,trial2
+2026-11-25T02:23:01,690949,B,replay,80acc429,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
+2026-11-25T02:23:01,690949,B,replay,80acc429,personal_message,reply_accepted,,used=m2,trial2
+2026-11-25T02:23:02,690949,B,replay,80acc429,personal_message,task_finished,,scenario=S3-birthday;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=1;misapplied_shown=m2;reliance=over-reliance;actions=none;final=m2:unchanged;correction=none,trial2
+2026-11-25T02:23:02,690949,B,replay,80acc429,personal_message,reason_given,,"text=It was a birthday message, so it did the job.",trial2
+2026-11-25T02:23:02,690949,B,replay,80acc429,personal_message,fit_judged,m2,answer=yes;truth=misapplied;correct=False;scenario=S3-birthday,trial2
+2026-11-25T02:23:02,690949,B,replay,,,task_started,,scenario=S4-work-email;memories=carried,
+2026-11-25T02:23:02,690949,B,replay,53843044,work_writing,reply_shown,,used=m2,trial3
+2026-11-25T02:23:02,690949,B,replay,53843044,work_writing,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
+2026-11-25T02:23:02,690949,B,replay,53843044,work_writing,reply_accepted,,used=m2,trial3
+2026-11-25T02:23:02,690949,B,replay,53843044,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=appropriate;actions=none;final=m2:unchanged;correction=none,trial3
+2026-11-25T02:23:03,690949,B,replay,53843044,work_writing,reason_given,,text=Good for work.,trial3
+2026-11-25T02:23:03,690949,B,replay,53843044,work_writing,fit_judged,m2,answer=yes;truth=fits;correct=True;scenario=S4-work-email,trial3
+2026-11-25T02:23:03,690949,B,replay,,,task_started,,scenario=S2-explain;memories=reset,
+2026-11-25T02:23:03,690949,B,replay,f2c42081,explain,reply_shown,,used=m1,trial4
+2026-11-25T02:23:03,690949,B,replay,f2c42081,explain,prediction_made,,predicted=m1;used=m1;exact=True;jaccard=1.0;scenario=S2-explain,trial4
+2026-11-25T02:23:03,690949,B,replay,f2c42081,explain,reply_flagged,,used=m1,trial4
+2026-11-25T02:23:03,690949,B,replay,f2c42081,explain,task_finished,,scenario=S2-explain;decision=flagged;accepted=False;flagged=True;corrected=none;sources_opened=0;seconds=0;misapplied_shown=m1;reliance=appropriate;actions=none;final=m1:unchanged;correction=none,trial4
+2026-11-25T02:23:03,690949,B,replay,f2c42081,explain,reason_given,,text=It felt a bit thin for a step-by-step question.,trial4
+2026-11-25T02:23:03,690949,B,replay,f2c42081,explain,fit_judged,m1,answer=no;truth=misapplied;correct=True;scenario=S2-explain,trial4
+2026-11-25T02:23:03,690949,B,replay,,,questionnaire_answered,,item=trust;score=5;reverse=False,
+2026-11-25T02:23:03,690949,B,replay,,,questionnaire_answered,,item=understanding;score=5;reverse=False,
+2026-11-25T02:23:03,690949,B,replay,,,questionnaire_answered,,item=predictability;score=5;reverse=False,
+2026-11-25T02:23:03,690949,B,replay,,,questionnaire_answered,,item=control;score=5;reverse=False,
+2026-11-25T02:23:03,690949,B,replay,,,questionnaire_answered,,item=effort;score=5;reverse=True,
+2026-11-25T02:23:03,690949,B,replay,,,questionnaire_answered,,item=comfort;score=5;reverse=False,
+2026-11-25T02:23:03,690949,B,replay,,,session_finished,,tasks=4;scheduled=4,
+2026-11-25T02:22:54,7dbe65,A,replay,,,session_started,,condition=A,
+2026-11-25T02:22:54,7dbe65,A,replay,,,task_started,,scenario=S1-dinner;memories=reset,
+2026-11-25T02:22:54,7dbe65,A,replay,186fed75,cooking,reply_shown,,"used=m3,m4",trial1
+2026-11-25T02:22:54,7dbe65,A,replay,186fed75,cooking,prediction_made,,"predicted=m3;used=m3,m4;exact=False;jaccard=0.5;scenario=S1-dinner",trial1
+2026-11-25T02:22:55,7dbe65,A,replay,186fed75,cooking,reply_accepted,,"used=m3,m4",trial1
+2026-11-25T02:22:55,7dbe65,A,replay,186fed75,cooking,task_finished,,"scenario=S1-dinner;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=1;misapplied_shown=none;reliance=appropriate;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
+2026-11-25T02:22:55,7dbe65,A,replay,186fed75,cooking,reason_given,,text=Looked good.,trial1
+2026-11-25T02:22:55,7dbe65,A,replay,186fed75,cooking,fit_judged,m3,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
+2026-11-25T02:22:55,7dbe65,A,replay,186fed75,cooking,fit_judged,m4,answer=unsure;truth=fits;correct=False;scenario=S1-dinner,trial1
+2026-11-25T02:22:56,7dbe65,A,replay,,,task_started,,scenario=S3-birthday;memories=reset,
+2026-11-25T02:22:56,7dbe65,A,replay,e9a13276,personal_message,reply_shown,,used=m2,trial2
+2026-11-25T02:22:56,7dbe65,A,replay,e9a13276,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
+2026-11-25T02:22:56,7dbe65,A,replay,e9a13276,,memory_forgotten,m2,,trial2
+2026-11-25T02:22:56,7dbe65,A,replay,e9a13276,personal_message,task_finished,,scenario=S3-birthday;decision=corrected;accepted=False;flagged=False;corrected=m2;sources_opened=0;seconds=0;misapplied_shown=m2;reliance=appropriate;actions=forget:m2;final=m2:forgotten;correction=forgot,trial2
+2026-11-25T02:22:56,7dbe65,A,replay,e9a13276,personal_message,reason_given,,text=I don't want it to write formally.,trial2
+2026-11-25T02:22:56,7dbe65,A,replay,e9a13276,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday,trial2
+2026-11-25T02:22:57,7dbe65,A,replay,,,task_started,,scenario=S4-work-email;memories=carried,
+2026-11-25T02:22:57,7dbe65,A,replay,85b47a78,work_writing,reply_shown,,used=,trial3
+2026-11-25T02:22:57,7dbe65,A,replay,85b47a78,work_writing,prediction_made,,predicted=none;used=none;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
+2026-11-25T02:22:57,7dbe65,A,replay,85b47a78,work_writing,reply_accepted,,used=,trial3
+2026-11-25T02:22:57,7dbe65,A,replay,85b47a78,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=n/a;actions=none;final=none;correction=n/a,trial3
+2026-11-25T02:22:58,7dbe65,A,replay,,,task_started,,scenario=S2-explain;memories=reset,
+2026-11-25T02:22:58,7dbe65,A,replay,7ed0023c,explain,reply_shown,,used=m1,trial4
+2026-11-25T02:22:58,7dbe65,A,replay,7ed0023c,explain,prediction_made,,predicted=none;used=m1;exact=False;jaccard=0.0;scenario=S2-explain,trial4
+2026-11-25T02:22:58,7dbe65,A,replay,7ed0023c,explain,reply_accepted,,used=m1,trial4
+2026-11-25T02:22:58,7dbe65,A,replay,7ed0023c,explain,task_finished,,scenario=S2-explain;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=m1;reliance=over-reliance;actions=none;final=m1:unchanged;correction=none,trial4
+2026-11-25T02:22:59,7dbe65,A,replay,7ed0023c,explain,reason_given,,"text=It answered the question, I suppose.",trial4
+2026-11-25T02:22:59,7dbe65,A,replay,7ed0023c,explain,fit_judged,m1,answer=yes;truth=misapplied;correct=False;scenario=S2-explain,trial4
+2026-11-25T02:22:59,7dbe65,A,replay,,,questionnaire_answered,,item=trust;score=3;reverse=False,
+2026-11-25T02:22:59,7dbe65,A,replay,,,questionnaire_answered,,item=understanding;score=3;reverse=False,
+2026-11-25T02:22:59,7dbe65,A,replay,,,questionnaire_answered,,item=predictability;score=3;reverse=False,
+2026-11-25T02:22:59,7dbe65,A,replay,,,questionnaire_answered,,item=control;score=3;reverse=False,
+2026-11-25T02:22:59,7dbe65,A,replay,,,questionnaire_answered,,item=effort;score=3;reverse=True,
+2026-11-25T02:22:59,7dbe65,A,replay,,,questionnaire_answered,,item=comfort;score=3;reverse=False,
+2026-11-25T02:22:59,7dbe65,A,replay,,,session_finished,,tasks=4;scheduled=4,
+2026-11-25T02:22:51,d02a10,A,replay,,,session_started,,condition=A,
+2026-11-25T02:22:51,d02a10,A,replay,,,task_started,,scenario=S1-dinner;memories=reset,
+2026-11-25T02:22:51,d02a10,A,replay,f0396b75,cooking,reply_shown,,"used=m3,m4",trial1
+2026-11-25T02:22:51,d02a10,A,replay,f0396b75,cooking,prediction_made,,"predicted=m3,m4;used=m3,m4;exact=True;jaccard=1.0;scenario=S1-dinner",trial1
+2026-11-25T02:22:51,d02a10,A,replay,f0396b75,cooking,reply_accepted,,"used=m3,m4",trial1
+2026-11-25T02:22:52,d02a10,A,replay,f0396b75,cooking,task_finished,,"scenario=S1-dinner;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=1;misapplied_shown=none;reliance=appropriate;actions=none;final=m3:unchanged,m4:unchanged;correction=none",trial1
+2026-11-25T02:22:52,d02a10,A,replay,f0396b75,cooking,reason_given,,"text=Vegetarian and quick, that's what I need.",trial1
+2026-11-25T02:22:52,d02a10,A,replay,f0396b75,cooking,fit_judged,m3,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
+2026-11-25T02:22:52,d02a10,A,replay,f0396b75,cooking,fit_judged,m4,answer=yes;truth=fits;correct=True;scenario=S1-dinner,trial1
+2026-11-25T02:22:52,d02a10,A,replay,,,task_started,,scenario=S3-birthday;memories=reset,
+2026-11-25T02:22:52,d02a10,A,replay,0fc594d8,personal_message,reply_shown,,used=m2,trial2
+2026-11-25T02:22:52,d02a10,A,replay,0fc594d8,personal_message,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S3-birthday,trial2
+2026-11-25T02:22:52,d02a10,A,replay,0fc594d8,personal_message,not_for_task,m2,,trial2
+2026-11-25T02:22:52,d02a10,A,replay,61a421b7,personal_message,reply_shown,,used=,trial2
+2026-11-25T02:22:52,d02a10,A,replay,0fc594d8,personal_message,task_finished,,scenario=S3-birthday;decision=corrected;accepted=False;flagged=False;corrected=m2;sources_opened=0;seconds=0;misapplied_shown=m2;reliance=appropriate;actions=restrict:m2@personal_message;final=m2:restricted;correction=scoped,trial2
+2026-11-25T02:22:52,d02a10,A,replay,0fc594d8,personal_message,reason_given,,"text=Formal is right for work, not for a friend.",trial2
+2026-11-25T02:22:52,d02a10,A,replay,0fc594d8,personal_message,fit_judged,m2,answer=no;truth=misapplied;correct=True;scenario=S3-birthday,trial2
+2026-11-25T02:22:53,d02a10,A,replay,,,task_started,,scenario=S4-work-email;memories=carried,
+2026-11-25T02:22:53,d02a10,A,replay,459a44e8,work_writing,reply_shown,,used=m2,trial3
+2026-11-25T02:22:53,d02a10,A,replay,459a44e8,work_writing,prediction_made,,predicted=m2;used=m2;exact=True;jaccard=1.0;scenario=S4-work-email,trial3
+2026-11-25T02:22:53,d02a10,A,replay,459a44e8,work_writing,reply_accepted,,used=m2,trial3
+2026-11-25T02:22:53,d02a10,A,replay,459a44e8,work_writing,task_finished,,scenario=S4-work-email;decision=accepted;accepted=True;flagged=False;corrected=none;sources_opened=0;seconds=0;misapplied_shown=none;reliance=appropriate;actions=none;final=m2:unchanged;correction=none,trial3
+2026-11-25T02:22:53,d02a10,A,replay,459a44e8,work_writing,reason_given,,"text=It's going to my manager, so formal is fine.",trial3
+2026-11-25T02:22:53,d02a10,A,replay,459a44e8,work_writing,fit_judged,m2,answer=yes;truth=fits;correct=True;scenario=S4-work-email,trial3
+2026-11-25T02:22:53,d02a10,A,replay,,,task_started,,scenario=S2-explain;memories=reset,
+2026-11-25T02:22:53,d02a10,A,replay,1e89208b,explain,reply_shown,,used=m1,trial4
+2026-11-25T02:22:53,d02a10,A,replay,1e89208b,explain,prediction_made,,predicted=m1;used=m1;exact=True;jaccard=1.0;scenario=S2-explain,trial4
+2026-11-25T02:22:53,d02a10,A,replay,1e89208b,explain,not_for_task,m1,,trial4
+2026-11-25T02:22:53,d02a10,A,replay,8bb836b1,explain,reply_shown,,used=,trial4
+2026-11-25T02:22:53,d02a10,A,replay,1e89208b,explain,task_finished,,scenario=S2-explain;decision=corrected;accepted=False;flagged=False;corrected=m1;sources_opened=0;seconds=0;misapplied_shown=m1;reliance=appropriate;actions=restrict:m1@explain;final=m1:restricted;correction=scoped,trial4
+2026-11-25T02:22:54,d02a10,A,replay,1e89208b,explain,reason_given,,"text=I asked for a proper explanation, not a summary.",trial4
+2026-11-25T02:22:54,d02a10,A,replay,1e89208b,explain,fit_judged,m1,answer=no;truth=misapplied;correct=True;scenario=S2-explain,trial4
+2026-11-25T02:22:54,d02a10,A,replay,,,questionnaire_answered,,item=trust;score=6;reverse=False,
+2026-11-25T02:22:54,d02a10,A,replay,,,questionnaire_answered,,item=understanding;score=6;reverse=False,
+2026-11-25T02:22:54,d02a10,A,replay,,,questionnaire_answered,,item=predictability;score=6;reverse=False,
+2026-11-25T02:22:54,d02a10,A,replay,,,questionnaire_answered,,item=control;score=6;reverse=False,
+2026-11-25T02:22:54,d02a10,A,replay,,,questionnaire_answered,,item=effort;score=6;reverse=True,
+2026-11-25T02:22:54,d02a10,A,replay,,,questionnaire_answered,,item=comfort;score=6;reverse=False,
+2026-11-25T02:22:54,d02a10,A,replay,,,session_finished,,tasks=4;scheduled=4,

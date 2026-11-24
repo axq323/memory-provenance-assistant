@@ -1,0 +1,2 @@
+condition,scenario,tasks,prediction_exact,fit_accuracy,reliance_appropriate
+A,S3-birthday,1,0.0,1.0,1.0

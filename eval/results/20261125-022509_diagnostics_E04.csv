@@ -1,0 +1,6 @@
+model,switches,repeat,used,parse_ok,dropped,answer
+qwen2.5:7b,normal,1,m2,True,-,"Subject: Request for Friday Afternoon Off Dear [Manager's Name], I am writing to formally "
+qwen2.5:7b,no-memories,1,-,True,-,"Subject: Request for Friday Afternoon Off Dear [Manager's Name], I hope this email finds y"
+qwen2.5:7b,no-json,1,-,True,-,"# Request for Friday Afternoon Off Dear [Manager's Name], I am writing to request time off"
+qwen2.5:7b,one-system,1,-,True,-,"# Request for Friday Afternoon Off Dear [Manager's Name], I am writing to request time off"
+qwen2.5:7b,one-system + no-json,1,-,False,-,"{""memories_used"": [{""id"": ""m2"", ""how"": ""Ensured a formal tone is maintained""}], ""answer"": "
