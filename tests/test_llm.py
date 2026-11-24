@@ -82,13 +82,13 @@ class _FakeCompletions:
         r = R(); c = R(); msg = R()
         msg.content = self.content
         c.message = msg
-        r.choices = [c]
+        r.choices = [c] # type: ignore
         return r
 
 
 def _live_with(fake):
     model = LiveModel("http://localhost:11434/v1", "test-model", "x")
-    model.client.chat.completions = fake
+    model.client.chat.completions = fake # type: ignore
     return model
 
 
@@ -119,9 +119,9 @@ def test_judge_model_comes_from_its_own_setting(monkeypatch):
     monkeypatch.setenv("LLM_MODEL", "llama3.2:3b")
     monkeypatch.setenv("JUDGE_MODEL", "qwen2.5:7b")
     judge = get_judge()
-    assert judge.model == "qwen2.5:7b" and judge.temperature == 0.0
+    assert judge.model == "qwen2.5:7b" and judge.temperature == 0.0 # type: ignore
     monkeypatch.delenv("JUDGE_MODEL")
-    assert get_judge().model == "qwen2.5:7b"          # default judge
+    assert get_judge().model == "qwen2.5:7b"          # type: ignore # default judge
 
 
 def test_work_email_scenario_uses_the_formal_tone_and_survives_the_birthday_correction(store):

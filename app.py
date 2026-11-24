@@ -19,7 +19,8 @@ from mpa.context import assemble  # noqa: E402
 from mpa.counterfactual import JUDGE_PROMPT_VERSION, calls_needed, check_influence, summarise  # noqa: E402
 from mpa.display import tame_headings  # noqa: E402
 from mpa.interaction_log import log_event, read_log  # noqa: E402
-from mpa.llm import ModelError, ReplayModel, get_judge, get_model  # noqa: E402
+from mpa.llm import (ModelError, default_mode, get_judge, get_model,  # noqa: E402
+                     live_available, live_model_name)
 from mpa.memory_store import MemoryStore  # noqa: E402
 from mpa.evaluation import (FIT_ANSWERS, LIKERT, QUESTIONNAIRE, carries_from, clean_comment,  # noqa: E402
                             correction_actions, correction_outcome, evaluation_schedule, final_state,
@@ -36,18 +37,13 @@ st.set_page_config(page_title="Memory Provenance Assistant", page_icon="🧠", l
 
 # ---------------------------------------------------------------- state ---
 @st.cache_resource
-def load_model():
-    return get_model()
+def load_model(mode: str):
+    return get_model(mode)
 
 
 @st.cache_resource
-def load_judge():
-    return get_judge()
-
-
-model = load_model()
-judge = load_judge()
-MODE = "replay" if isinstance(model, ReplayModel) else "live"
+def load_judge(mode: str):
+    return get_judge(mode)
 
 # A locked evaluation session (?evaluate=1 in the URL) is what a participant sees: evaluation mode
 # is on, the memory-sources setting comes from the URL (?condition=B) and can't be changed, and
@@ -57,9 +53,20 @@ MODE = "replay" if isinstance(model, ReplayModel) else "live"
 ss = st.session_state
 _url_locked = st.query_params.get("evaluate", "0") == "1"
 _url_condition = "B" if st.query_params.get("condition", "A").upper() == "B" else "A"
-ss.setdefault("pinned", {"locked": _url_locked, "condition": _url_condition})
+ss.setdefault("pinned", {"locked": _url_locked, "condition": _url_condition, "mode": default_mode()})
 SESSION_LOCKED = ss.pinned["locked"]
 URL_CONDITION = ss.pinned["condition"]
+
+# Replay or live. A session starts in MODE from .env. Outside evaluation mode the developer
+# controls can switch it (mode_changed), which clears the chat so every reply on screen, and
+# any check run on it, comes from the same model. A locked session keeps the mode it started in.
+ss.setdefault("mode", ss.pinned.get("mode", default_mode()))
+if SESSION_LOCKED:
+    ss.mode = ss.pinned.get("mode", default_mode())
+ss.setdefault("mode_choice", ss.mode)   # the switch's own value; mode_changed accepts or reverts it
+MODE = ss.mode
+model = load_model(MODE)
+judge = load_judge(MODE)
 
 ss.setdefault("messages", [])          # user / assistant turns
 ss.setdefault("session_id", uuid.uuid4().hex[:6])
@@ -131,7 +138,7 @@ def log(event: str, trial_id: str | None = None, **kw) -> None:
             trial_id = ss.eval_task["trial_id"]
         else:
             trial_id = ""
-    log_event(event, session_id=ss.session_id, condition=ss.condition, mode=MODE,
+    log_event(event, session_id=ss.session_id, condition=ss.condition, mode=ss.get("mode", MODE),
               path=log_path(), trial_id=trial_id, **kw)
 
 
@@ -184,7 +191,12 @@ def respond(user_text: str, history: list[dict], trial_id: str = "") -> dict:
         detail="used=" + ",".join(u["id"] for u in reply.used))
     return {"role": "assistant", "turn_id": record.turn_id, "user_text": user_text,
             "task": task, "reply": reply, "record": record, "trial_id": trial_id,
-            "history": [dict(h) for h in history]}
+            "history": [dict(h) for h in history], "mode": MODE, "model_label": model_label()}
+
+
+def model_label() -> str:
+    """Shown under each reply, so scripted (simulated) and live replies can't be confused."""
+    return "Scripted reply (replay mode)" if MODE == "replay" else f"Live reply from {model.model}"
 
 
 def toggle_source(key: str, memory_id: str, turn_id: str = "") -> None:
@@ -323,6 +335,32 @@ def new_session() -> None:
     shown = "shown" if ss.condition == "A" else "hidden"
     ss.flash = [f"New session {ss.session_id}: memory sources {shown}."]
     log("session_started", detail=f"condition={ss.condition}")
+
+
+def mode_changed() -> None:
+    """Developer controls: switch between replay and live. Live is switched on only if the
+    endpoint answers. Switching clears the chat but keeps memories and corrections, so a reply
+    and its influence check always come from the same model. Not available in evaluation mode,
+    where every participant must get the same replies."""
+    choice = ss.mode_choice
+    if choice == ss.mode:
+        return
+    if ss.evaluation_mode:                  # the switch is disabled then; this is a safeguard
+        ss.mode_choice = ss.mode
+        return
+    message = ""
+    if choice == "live":
+        ok, message = live_available()
+        if not ok:
+            ss.mode_choice = ss.mode        # put the switch back
+            ss.flash.append(message)
+            return
+    old = ss.mode
+    ss.mode = choice
+    clear_session_state()
+    log("mode_switched", detail=f"from={old};to={choice}")
+    ss.flash.append((message + " " if message else "")
+                    + f"Switched to {choice} mode. Chat cleared; your memories and corrections are kept.")
 
 
 def condition_changed() -> None:
@@ -614,6 +652,8 @@ def render_reply(msg_index: int, msg: dict) -> None:
     rec = msg["record"]
     active = reply_is_active(msg)
     st.markdown(tame_headings(reply.answer))
+    if msg.get("model_label"):
+        st.caption(msg["model_label"])
     if reply.note:
         st.warning(reply.note)
     # 1. memories the assistant says it used
@@ -735,6 +775,12 @@ def render_memory_panel() -> None:
 def render_controls() -> None:
     """Developer controls. Hidden in a locked evaluation session (?evaluate=1)."""
     with st.expander("Demo and evaluation controls"):
+        st.radio("Model", ["replay", "live"], key="mode_choice", on_change=mode_changed, horizontal=True,
+                 format_func=lambda m: {"replay": "Replay (scripted)",
+                                        "live": f"Live ({live_model_name()})"}[m],
+                 disabled=ss.evaluation_mode,
+                 help="Switching clears the chat; memories and corrections are kept. Live needs the "
+                      "endpoint in .env (e.g. Ollama) to be running. Fixed while evaluation mode is on.")
         st.radio("Memory sources", ["A", "B"], key="condition", on_change=condition_changed,
                  format_func=lambda c: {"A": "Shown: memories + where they came from",
                                         "B": "Hidden: memories only (for comparison)"}[c])
@@ -793,6 +839,9 @@ if MODE == "replay" and not ss.evaluation_mode:
         col.button(scenario["prompt"], key=f"demo_{scenario['id']}", on_click=queue_prompt,
                    args=(scenario["prompt"],), use_container_width=True,
                    disabled=LOCKED)
+elif MODE == "live" and not ss.evaluation_mode:
+    st.info(f"**Live mode:** replies come from {model.model}. Ask anything; "
+            "the demo prompts from replay mode work here too.")
 
 for i, msg in enumerate(ss.messages):
     if msg["role"] == "notice":

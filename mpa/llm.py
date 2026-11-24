@@ -97,28 +97,60 @@ class LiveModel:
         return resp.choices[0].message.content or ""
 
 
-def get_model():
-    """Build the model from environment configuration (see .env.example)."""
-    mode = os.getenv("MODE", "replay").strip().lower()
-    if mode == "live":
+def default_mode() -> str:
+    """The mode a new session starts in: MODE in .env ("live" or "replay", default replay).
+    The app can switch a session to the other mode (app.py, mode_changed)."""
+    return "live" if os.getenv("MODE", "replay").strip().lower() == "live" else "replay"
+
+
+def live_model_name() -> str:
+    return os.getenv("LLM_MODEL", "qwen2.5:7b")
+
+
+def get_model(mode: str | None = None):
+    """Build the model for a mode ("replay" or "live"; default: MODE in .env, see .env.example)."""
+    if (mode or default_mode()) == "live":
         return LiveModel(
             base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
-            model=os.getenv("LLM_MODEL", "qwen2.5:7b"),
+            model=live_model_name(),
             api_key=os.getenv("LLM_API_KEY", ""))
     return ReplayModel()
 
 
-def get_judge():
+def get_judge(mode: str | None = None):
     """The model that judges the counterfactual check (live mode only).
 
     JUDGE_MODEL can differ from LLM_MODEL, so the assistant isn't grading
     itself (e.g. llama3.2:3b as assistant, qwen2.5:7b as judge). Replay mode
     needs no judge, so this returns None there.
     """
-    if os.getenv("MODE", "replay").strip().lower() != "live":
+    if (mode or default_mode()) != "live":
         return None
     return LiveModel(
         base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
         model=os.getenv("JUDGE_MODEL", "qwen2.5:7b"),
         api_key=os.getenv("LLM_API_KEY", ""),
         temperature=0.0)
+
+
+def live_available(timeout: float = 3.0) -> tuple[bool, str]:
+    """Can live mode be used right now? Asks the endpoint for its list of models, which costs
+    no tokens. Returns (ok, message): the message says why not, or warns that the judge model
+    is missing (replies still work then; only the influence check would fail)."""
+    from openai import OpenAI
+    base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+    model, judge = live_model_name(), os.getenv("JUDGE_MODEL", "qwen2.5:7b")
+    try:
+        client = OpenAI(base_url=base_url, api_key=os.getenv("LLM_API_KEY", "") or "none",
+                        timeout=timeout, max_retries=0)
+        ids = {m.id for m in client.models.list()}
+    except Exception as exc:  # not running, wrong URL, bad key...
+        return False, (f"Couldn't reach the live model at {base_url} ({type(exc).__name__}). "
+                       "Is Ollama running? Staying in replay mode.")
+    if ids and model not in ids:
+        return False, (f"The endpoint answered, but {model} isn't available there "
+                       f"(with Ollama: ollama pull {model}). Staying in replay mode.")
+    if ids and judge not in ids:
+        return True, (f"Live mode on. The judge model {judge} isn't available, so the "
+                      f"influence check won't run until you pull it.")
+    return True, f"Live mode on: replies now come from {model}."

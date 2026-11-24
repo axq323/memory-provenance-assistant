@@ -24,7 +24,7 @@ EVENTS = {
     "memory_edited", "memory_forgotten", "reply_accepted", "reply_flagged", "demo_reset",
     "influence_checked", "chat_cleared", "prediction_made", "task_finished", "fit_judged",
     "questionnaire_answered", "session_finished", "session_started", "reason_given", "task_started",
-    "condition_change_ignored",
+    "condition_change_ignored", "mode_switched",
 }
 
 
