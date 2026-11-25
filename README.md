@@ -155,10 +155,11 @@ Grouped by stage, with links to the commits.
 ## AI assistance
 
 - **Claude (Anthropic), 23–24 Nov:**
-  - Helped fix bugs and generate test cases.
+  - Helped fix bugs, improve reasoning and generate test cases.
   - Reviewed the report draft against the brief and rubric. I adopted its suggested rationale table, scope statement and the account of the study-assistant change, and checked each claim in the report against the code, commits and `eval/prompt_log.md`.
   - Helped draft this README from the code and commit history. I checked the status, commands and development record against the repository.
   - Wrote the replay/live switch (`mpa/llm.py`, `app.py`) and its tests (`tests/test_mode_switch.py`). I reviewed the code in VS Code, added type-checker suppressions (`# type: ignore`) in two test files, ran `pytest` – 224 passed.
+  -Helped with judge redesign and adding the counterfactual `mpa/counterfactual.py`.
 - The design decisions, the scenarios and the evaluation design are my own, and every result in `eval/` comes from my own runs.
 
 ## Additional files
