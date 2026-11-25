@@ -2,35 +2,33 @@
 
 A general everyday chat assistant that shows which stored memories shaped each reply. The person can open the conversation each memory came from, then keep, restrict, edit or forget the memory and see the rewritten reply. Prototype for the Intelligent Interactive Systems project (Assignment 2).
 
-> README prose word count: **about 1,850** (code blocks, commands and tables of file paths excluded)
+> README prose word count: **about 1,460** (code blocks, commands and tables of file paths excluded)
 > Submitted version: tag [`v1.0-submission`](https://github.com/axq323/memory-provenance-assistant/releases/tag/v1.0-submission)
 
 ## Project status
 
 **Implemented**
 - Streamlit chat with a memory panel ("What I remember about you").
-- Keyword task classifier: each request gets a task type before the model call, and the developer view shows the trigger word.
-- Context assembly that leaves out memories the person has restricted for this task type and records what was sent, what was withheld and why.
-- Reply validator: a memory chip appears only if the model claims the memory **and** it was actually sent.
-- Under each reply, three lists: memories the assistant reported, memories sent but not reported, and memories withheld.
-- Memory controls: *Show where this came from* (source conversation, date, highlighted message), *Not for [task type]* with Undo and an automatic rewrite, *Edit* and *Forget*. Forget also blanks the wording in this chat's records.
-- Live mode for any OpenAI-compatible endpoint (tested with Ollama and qwen2.5:7b).
-- A replay/live switch in the developer controls. Live is switched on only if the endpoint answers; switching clears the chat but keeps memories and corrections. Every reply is labelled *Scripted reply* or *Live reply from …*. The switch is fixed during evaluation mode and hidden in participant sessions.
-- Memory influence check: the reply is regenerated without each memory, then a judge model decides, one reply at a time, whether each reply follows that memory.
-- Evaluation mode: four fixed tasks, a prediction before each reply, a free reaction, a written reason, a fit question and a six-item questionnaire. It has a memory-sources setting (A shown / B hidden) that is pinned for the whole session, plus per-session logs and scripts for analysis and blind coding of reasons.
-- Benchmark: 14 cases (4 held out), automated criteria C1–C4, a prompt log and a manual-check sheet.
+- Keyword task classifier: each request gets a task type before the model call.
+- Context assembly: leaves out memories restricted for this task type and records what was sent, withheld and why.
+- Reply validator: a memory chip appears only if the model claims the memory **and** it was sent.
+- Under each reply: memories reported, sent but not reported, and withheld.
+- Memory controls: *Show where this came from*, *Not for [task type]* (with Undo and a rewritten reply), *Edit*, *Forget*.
+- Replay mode (scripted, default) and live mode for any OpenAI-compatible endpoint (tested with Ollama and qwen2.5:7b), switchable in the developer controls.
+- Memory influence check: regenerates the reply without each memory; in live mode a judge model checks each reply.
+- Evaluation mode: four fixed tasks (predict, react, explain, judge fit) and a short questionnaire, with sources shown (A) or hidden (B), per-session logs and analysis scripts.
+- Benchmark: 14 cases (4 held out), criteria C1–C4 and a prompt log.
 
 **Simulated**
 - The four seeded memories and their source conversations (`data/`) are fictional.
-- Replay-mode replies (`data/replay.json`) are scripted. Which scripted reply appears depends on which memories were actually sent, so corrections change it just as they would in live mode.
-- `eval/sample_session_log_SIMULATED.csv` holds four scripted sessions driven through the app. No real people took part.
+- Replay replies (`data/replay.json`) are scripted. Which one appears depends on the memories actually sent, so corrections still change it.
+- `eval/sample_session_log_SIMULATED.csv` holds four scripted sessions. No real people took part.
 
 **Not done (planned)**
-- No user study has been run. Evaluation mode and the analysis scripts are ready for one.
-- The assistant does not create new memories from conversation. There is no confirm-before-saving step, no expiry of outdated memories and no ask-before-applying. I left these out on purpose: adding them would bring in errors at memory creation and blur the comparison.
+- Evaluation mode has not been run with users.
+- No memory creation from conversation: no confirm-before-saving, expiry or ask-before-applying. Left out so that errors in creating memories don't confound the comparison.
 - In replay mode, editing a memory's wording doesn't change the scripted text.
-- The manual-check tool exists, but no sheet has been filled in yet.
-- The keyword classifier can miss unfamiliar phrasing. When it does, a restriction for that task type is not applied.
+- The keyword classifier can miss unfamiliar phrasing, so a restriction may not apply.
 
 ## Technology stack
 
@@ -121,9 +119,8 @@ Grouped by stage, with links to the commits.
 
 **3. Measuring influence instead of trusting the list (21–22 Nov).** [4e6cecd](https://github.com/axq323/memory-provenance-assistant/commit/4e6cecd), [15d04cb](https://github.com/axq323/memory-provenance-assistant/commit/15d04cb), [345b664](https://github.com/axq323/memory-provenance-assistant/commit/345b664), [b2da9dd](https://github.com/axq323/memory-provenance-assistant/commit/b2da9dd)
 - Added the counterfactual check: regenerate without each memory and compare.
-- The first judge compared two whole replies and blamed unrelated wording changes on the removed memory (e.g. "formal tone changed a lunch recipe"). I redesigned it to ask one yes/no question about one reply at a time.
-- Judge prompt j2 separates style preferences (judge the form) from facts (judge the content). In j3 the judge writes its reason before its answer, because in j2 the answer sometimes contradicted the reason.
-- Added a "fits, no difference" verdict, and started showing memories that were sent but not listed under every reply, because the assistant may use them without saying so.
+- The first judge compared two whole replies and blamed unrelated wording on the removed memory, so I redesigned it to ask one yes/no question about one reply at a time (prompt j3: reason before answer).
+- Memories sent but not listed now appear under every reply, because the assistant may use them without saying so.
 
 **4. Fixing history and correction bugs (22 Nov).** [8edf585](https://github.com/axq323/memory-provenance-assistant/commit/8edf585)
 - A rewrite now reuses the history the original reply was sent with, and a corrected reply no longer leaks into later turns.
@@ -140,24 +137,18 @@ Grouped by stage, with links to the commits.
 - Added the work email as a scripted scenario, so the scoped correction can be shown surviving.
 
 **7. Evaluation mode (22–23 Nov).** [9fb4ab5](https://github.com/axq323/memory-provenance-assistant/commit/9fb4ab5), [a5a2770](https://github.com/axq323/memory-provenance-assistant/commit/a5a2770), [66315fc](https://github.com/axq323/memory-provenance-assistant/commit/66315fc), [14625dc](https://github.com/axq323/memory-provenance-assistant/commit/14625dc), [730501a](https://github.com/axq323/memory-provenance-assistant/commit/730501a), [de9a0b2](https://github.com/axq323/memory-provenance-assistant/commit/de9a0b2), [5a8f6ab](https://github.com/axq323/memory-provenance-assistant/commit/5a8f6ab), [9bc8cea](https://github.com/axq323/memory-provenance-assistant/commit/9bc8cea), [0248a9c](https://github.com/axq323/memory-provenance-assistant/commit/0248a9c)
-- The fit question comes *after* the reaction, so it can't prime the reaction.
-- The questionnaire is logged apart from behaviour.
-- Each session has its own memories and log, so one person's corrections can't change another's replies.
-- Every task starts from the seeded memories, except the work email, which deliberately keeps the birthday task's changes.
-- "Too formal" (noticing a mismatch) is coded separately from naming the memory's scope.
-- The memory-sources setting is pinned when a session starts. A test reproduced a mid-session URL change that would otherwise have mixed the two settings.
-- Correcting a memory the reply didn't use is no longer scored as over-reliance.
+- The fit question comes after the reaction, so it can't prime it; the questionnaire is logged apart from behaviour.
+- Each session has its own memories and log. Each task starts from the seeded memories, except the work email, which keeps the birthday task's changes.
+- The sources setting is pinned per session, after a test showed a mid-session URL change could mix the two.
+- Scoring fixes: noticing a mismatch is coded apart from naming the scope, and correcting a memory the reply didn't use isn't scored as over-reliance.
 
 **8. Being honest about what the benchmark measures (23 Nov).** [060cf87](https://github.com/axq323/memory-provenance-assistant/commit/060cf87)
 - C1–C4 score the model's *report*, not the reply. A non-answer that lists the right memories passes. Tests now demonstrate both blind spots, results keep the reply text, and `manual_check.py` supports checking replies by hand.
 
 **9. Replay/live switch (24 Nov).** [6cc8bf0](https://github.com/axq323/memory-provenance-assistant/commit/6cc8bf0815806a10f0fe8b142d948d5510770907)
-- Switching modes used to mean editing `.env` and restarting, so I added a switch to the developer controls.
-- Switching clears the chat. Otherwise the influence check could run on a scripted reply using live regenerations, which would compare replies from two different models.
-- The app asks the endpoint for its model list before going live (no tokens used) and stays in replay with a message if Ollama isn't running or the model isn't pulled.
-- The switch is fixed during evaluation mode, so every participant gets the same replies.
-- Each reply is now labelled as scripted or live, so simulated and implemented behaviour can't be confused on screen.
-- Checked with 8 new tests in `tests/test_mode_switch.py` (the endpoint is faked, so no model is needed) and by hand with Ollama running and stopped.
+- Added a replay/live switch to the developer controls (before, it meant editing `.env` and restarting). It goes live only if the endpoint answers, and switching clears the chat so a reply and its influence check always come from the same model.
+- Each reply is labelled scripted or live; the switch is fixed during evaluation mode.
+- Checked with 8 new tests in `tests/test_mode_switch.py` (endpoint faked) and by hand with Ollama running and stopped.
 
 **How I checked the work:** headless UI and unit tests for each change (221 at submission), repeated live runs with results in `eval/results/` and `eval/prompt_log.md`, and four scripted sessions run end to end through the analysis.
 
@@ -165,9 +156,8 @@ Grouped by stage, with links to the commits.
 
 - **Claude (Anthropic), 23–24 Nov:**
   - Reviewed the report draft against the brief and rubric. I adopted its suggested rationale table, scope statement and the account of the study-assistant change, and checked each claim in the report against the code, commits and `eval/prompt_log.md`.
-  - Drafted this README from the code and commit history. I checked the status, commands and development record against the repository.
+  - Helped draft this README from the code and commit history. I checked the status, commands and development record against the repository.
   - Wrote the replay/live switch (`mpa/llm.py`, `app.py`) and its tests (`tests/test_mode_switch.py`). I reviewed the code in VS Code, added type-checker suppressions (`# type: ignore`) in two test files, ran `pytest` – 221 passed.
-- An AI-drafted documentation description called the users "university students". I corrected it to match the everyday scenarios.
 - The design decisions, the scenarios and the evaluation design are my own, and every result in `eval/` comes from my own runs.
 
 ## Additional files
