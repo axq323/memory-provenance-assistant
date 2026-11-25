@@ -76,6 +76,22 @@ if PROMPT_VERSION not in SYSTEM_PROMPTS:
 SYSTEM_PROMPT = SYSTEM_PROMPTS[PROMPT_VERSION]
 
 
+MEMORY_BLOCK_HEADER = "STORED MEMORIES:\n"
+
+
+def memory_block(memories: list[dict], version: str) -> str:
+    """The stored-memories message, built from the record's {id, text, source} entries.
+
+    assemble() and redact_memory() both use this, so a redacted block has exactly
+    the format of the original, minus the forgotten memory's wording and source.
+    """
+    show_source = version in SOURCES_IN_PROMPT
+    return MEMORY_BLOCK_HEADER + "\n".join(
+        f"- [{m['id']}] {m['text']}"
+        + (f" (saved from: {m['source']})" if show_source and m.get("source") else "")
+        for m in memories)
+
+
 @dataclass
 class ContextRecord:
     turn_id: str
@@ -93,16 +109,19 @@ class ContextRecord:
         return {m["id"] for m in self.memories_sent}
 
     def redact_memory(self, memory_id: str) -> None:
-        """Forgetting removes derived copies too (Lecture 10)."""
+        """Forgetting removes derived copies too (Lecture 10).
+
+        The stored-memories message is rebuilt from memories_sent rather than
+        edited line by line, so a multiline memory (Edit uses a text area) and its
+        source title are removed whole, and no other memory's text is touched.
+        """
         for m in self.memories_sent + self.memories_withheld:
             if m["id"] == memory_id:
                 m["text"] = "[forgotten]"
                 m.pop("source", None)
         for msg in self.messages:
-            if msg["role"] == "system" and f"[{memory_id}]" in msg["content"]:
-                msg["content"] = "\n".join(
-                    f"- [{memory_id}] [forgotten]" if line.startswith(f"- [{memory_id}]") else line
-                    for line in msg["content"].splitlines())
+            if msg["role"] == "system" and msg["content"].startswith(MEMORY_BLOCK_HEADER):
+                msg["content"] = memory_block(self.memories_sent, self.prompt_version)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -143,11 +162,7 @@ def assemble(user_text: str, memories: list[dict], task: str, trigger: str | Non
     # 2. order: instructions -> memories -> history -> task restated last
     messages = [{"role": "system", "content": SYSTEM_PROMPTS[version]}]
     if selected:
-        show_source = version in SOURCES_IN_PROMPT
-        lines = "\n".join(f"- [{m['id']}] {m['text']}"
-                          + (f" (saved from: {m['source_title']})" if show_source and m.get("source_title") else "")
-                          for m in selected)
-        messages.append({"role": "system", "content": "STORED MEMORIES:\n" + lines})
+        messages.append({"role": "system", "content": memory_block(record.memories_sent, version)})
     recent = (history or [])[-MAX_HISTORY_TURNS:]
     record.history_turns_sent = len(recent)
     messages.extend({"role": h["role"], "content": h["content"]} for h in recent)

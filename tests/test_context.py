@@ -1,3 +1,4 @@
+import pytest
 from mpa import context
 from mpa.context import assemble
 
@@ -54,6 +55,33 @@ def test_redact_removes_memory_text_from_record():
     everything = str(rec.to_dict())
     assert "memory 1" not in everything
     assert "memory 2" in everything
+
+
+
+@pytest.mark.parametrize("version", ["v2", "v4"])
+def test_redact_removes_every_line_of_a_multiline_memory(version):
+    """Edit uses a text area, so a memory can span lines; Forget must blank all of them."""
+    mems = [{"id": "m1", "text": "Bullet points.\nKeep them short.\nPRIVATE DETAIL", "source_title": "Essay chat"},
+            {"id": "m2", "text": "Formal tone.\nSecond line kept.", "source_title": "Work email"}]
+    rec = assemble("hi", mems, "other", None, prompt_version=version)
+    before = rec.messages[1]["content"]
+    rec.redact_memory("m1")
+    block = rec.messages[1]["content"]
+    assert "Keep them short" not in block and "PRIVATE DETAIL" not in block and "Essay chat" not in block
+    assert "- [m1] [forgotten]" in block
+    assert "Formal tone.\nSecond line kept." in block            # other memories untouched
+    assert ("Work email" in block) == (version == "v4")
+    assert "PRIVATE DETAIL" not in str(rec.to_dict())
+    assert before.splitlines()[0] == block.splitlines()[0] == "STORED MEMORIES:"
+
+
+def test_redacted_single_line_block_matches_the_old_format(store):
+    rec = assemble("hi", store.all(), "other", None, prompt_version="v4")
+    original = rec.messages[1]["content"]
+    rec.redact_memory("m2")
+    expected = "\n".join("- [m2] [forgotten]" if line.startswith("- [m2]") else line
+                          for line in original.splitlines())
+    assert rec.messages[1]["content"] == expected
 
 
 # ------------------------------------------------------------ prompt versions ---
